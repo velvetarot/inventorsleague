@@ -1,0 +1,118 @@
+{% extends 'base.html' %}
+{% block title %}Messages{% endblock %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h4 class="fw-bold mb-0">Messages</h4>
+  <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#composeModal">
+    <i class="bi bi-pencil-square me-1"></i>New Message
+  </button>
+</div>
+
+<ul class="nav nav-tabs mb-3" id="msgTabs">
+  <li class="nav-item">
+    <a class="nav-link active" data-bs-toggle="tab" href="#inbox">
+      Inbox <span class="badge bg-danger ms-1" id="unread-tab-badge">
+        {% set unread = inbox | selectattr('read','eq',false) | list | length %}
+        {% if unread %}{{ unread }}{% endif %}
+      </span>
+    </a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link" data-bs-toggle="tab" href="#sent">Sent ({{ sent|length }})</a>
+  </li>
+</ul>
+
+<div class="tab-content">
+
+  <!-- Inbox -->
+  <div class="tab-pane fade show active" id="inbox">
+    <div class="card">
+      {% if inbox %}
+      <ul class="list-group list-group-flush">
+        {% for msg in inbox %}
+        <li class="list-group-item {% if not msg.read %}fw-bold bg-light{% endif %}">
+          <a href="{{ url_for('message_view', msg_id=msg.id) }}" class="text-decoration-none text-dark d-flex justify-content-between align-items-start">
+            <div>
+              {% if not msg.read %}<span class="badge bg-danger me-2">New</span>{% endif %}
+              <span class="{% if not msg.read %}fw-bold{% endif %}">{{ msg.subject }}</span>
+              <div class="text-muted small fw-normal">From: {{ msg.sender.name }}</div>
+            </div>
+            <span class="text-muted small flex-shrink-0 ms-3">{{ msg.created_at.strftime('%d %b %H:%M') }}</span>
+          </a>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <div class="card-body text-muted">Your inbox is empty.</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Sent -->
+  <div class="tab-pane fade" id="sent">
+    <div class="card">
+      {% if sent %}
+      <ul class="list-group list-group-flush">
+        {% for msg in sent %}
+        <li class="list-group-item">
+          <a href="{{ url_for('message_view', msg_id=msg.id) }}" class="text-decoration-none text-dark d-flex justify-content-between align-items-start">
+            <div>
+              <span>{{ msg.subject }}</span>
+              <div class="text-muted small">To: {{ msg.recipient.name }}
+                {% if msg.read %}<span class="badge bg-success ms-2">Read</span>{% else %}<span class="badge bg-secondary ms-2">Unread</span>{% endif %}
+              </div>
+            </div>
+            <span class="text-muted small flex-shrink-0 ms-3">{{ msg.created_at.strftime('%d %b %H:%M') }}</span>
+          </a>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <div class="card-body text-muted">No sent messages.</div>
+      {% endif %}
+    </div>
+  </div>
+
+</div>
+
+<!-- Compose Modal -->
+<div class="modal fade" id="composeModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post" action="{{ url_for('message_send') }}">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-pencil-square me-2"></i>New Message</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label fw-semibold">To</label>
+            <select name="recipient_id" class="form-select" required>
+              <option value="">— select recipient —</option>
+              {% for u in users %}
+              <option value="{{ u.id }}">
+                {{ u.name }} {% if u.is_online %}🟢{% endif %}
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Subject</label>
+            <input type="text" name="subject" class="form-control" required placeholder="Subject">
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Message</label>
+            <textarea name="body" class="form-control" rows="6" required placeholder="Write your message…"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="bi bi-send me-1"></i>Send</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

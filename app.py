@@ -5,7 +5,7 @@ from werkzeug.utils import secure_filename
 from flask import Flask, render_template, redirect, url_for, request, flash, jsonify
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from sqlalchemy import or_, func
-from models import db, User, School, Activity, Parent, ParentActivity, EmailTemplate, EmailLog, Attachment
+from models import db, User, School, Activity, Parent, ParentActivity, EmailTemplate, EmailLog, Attachment, Message
 from brevo import send_email
 from dotenv import load_dotenv
 
@@ -38,6 +38,29 @@ login_manager.login_message = 'Please log in to access the CRM.'
 @login_manager.user_loader
 def load_user(user_id):
     return User.query.get(int(user_id))
+
+
+# ── Online presence ───────────────────────────────────────────────────────────
+
+@app.before_request
+def update_last_seen():
+    if current_user.is_authenticated:
+        current_user.last_seen = datetime.utcnow()
+        db.session.commit()
+
+
+@app.context_processor
+def inject_online_users():
+    if current_user.is_authenticated:
+        from datetime import timedelta
+        cutoff = datetime.utcnow() - timedelta(minutes=5)
+        online = User.query.filter(
+            User.last_seen >= cutoff,
+            User.id != current_user.id
+        ).all()
+        unread = Message.query.filter_by(recipient_id=current_user.id, read=False).count()
+        return {'online_users': online, 'unread_count': unread}
+    return {'online_users': [], 'unread_count': 0}
 
 
 # ── Auth ──────────────────────────────────────────────────────────────────────
@@ -492,6 +515,65 @@ def email_send():
     return redirect(request.referrer)
 
 
+# ── Messaging ─────────────────────────────────────────────────────────────────
+
+@app.route('/messages')
+@login_required
+def messages_inbox():
+    inbox = Message.query.filter_by(recipient_id=current_user.id) \
+                   .order_by(Message.created_at.desc()).all()
+    sent = Message.query.filter_by(sender_id=current_user.id) \
+                  .order_by(Message.created_at.desc()).all()
+    users = User.query.filter(User.id != current_user.id).all()
+    return render_template('messages/inbox.html', inbox=inbox, sent=sent, users=users)
+
+
+@app.route('/messages/send', methods=['POST'])
+@login_required
+def message_send():
+    recipient = User.query.get_or_404(request.form.get('recipient_id', type=int))
+    msg = Message(
+        sender_id=current_user.id,
+        recipient_id=recipient.id,
+        subject=request.form.get('subject', '').strip(),
+        body=request.form.get('body', '').strip(),
+    )
+    db.session.add(msg)
+    db.session.commit()
+    flash(f'Message sent to {recipient.name}.', 'success')
+    return redirect(url_for('messages_inbox'))
+
+
+@app.route('/messages/<int:msg_id>')
+@login_required
+def message_view(msg_id):
+    msg = Message.query.get_or_404(msg_id)
+    if msg.recipient_id != current_user.id and msg.sender_id != current_user.id:
+        flash('Access denied.', 'danger')
+        return redirect(url_for('messages_inbox'))
+    if msg.recipient_id == current_user.id and not msg.read:
+        msg.read = True
+        db.session.commit()
+    return render_template('messages/view.html', msg=msg)
+
+
+@app.route('/messages/<int:msg_id>/delete', methods=['POST'])
+@login_required
+def message_delete(msg_id):
+    msg = Message.query.get_or_404(msg_id)
+    if msg.recipient_id == current_user.id or msg.sender_id == current_user.id:
+        db.session.delete(msg)
+        db.session.commit()
+    return redirect(url_for('messages_inbox'))
+
+
+@app.route('/api/unread_count')
+@login_required
+def api_unread_count():
+    count = Message.query.filter_by(recipient_id=current_user.id, read=False).count()
+    return jsonify({'count': count})
+
+
 # ── Reminders API ─────────────────────────────────────────────────────────────
 
 @app.route('/api/reminders')
@@ -814,8 +896,9 @@ def migrate_db():
     migrations = [
         ('schools', 'business_manager_name',  'VARCHAR(200)'),
         ('schools', 'business_manager_email', 'VARCHAR(150)'),
-        ('schools', 'stage',                  'VARCHAR(50) DEFAULT \'New\''),
+        ('schools', 'stage',                  "VARCHAR(50) DEFAULT 'New'"),
         ('schools', 'school_notes',           'TEXT'),
+        ('users',   'last_seen',              'TIMESTAMP'),
     ]
     with db.engine.connect() as conn:
         for table, column, col_type in migrations:

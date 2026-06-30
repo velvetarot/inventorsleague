@@ -1,0 +1,52 @@
+{% extends 'base.html' %}
+{% block title %}{{ msg.subject }}{% endblock %}
+{% block content %}
+
+<div class="mb-3">
+  <a href="{{ url_for('messages_inbox') }}" class="text-muted small text-decoration-none">
+    <i class="bi bi-arrow-left me-1"></i>Back to Messages
+  </a>
+</div>
+
+<div class="card mb-3">
+  <div class="card-header py-3">
+    <div class="d-flex justify-content-between align-items-start">
+      <div>
+        <h5 class="fw-bold mb-1">{{ msg.subject }}</h5>
+        <div class="text-muted small">
+          <strong>From:</strong> {{ msg.sender.name }} &nbsp;|&nbsp;
+          <strong>To:</strong> {{ msg.recipient.name }} &nbsp;|&nbsp;
+          {{ msg.created_at.strftime('%d %b %Y at %H:%M') }}
+        </div>
+      </div>
+      <form method="post" action="{{ url_for('message_delete', msg_id=msg.id) }}"
+            onsubmit="return confirm('Delete this message?')">
+        <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+      </form>
+    </div>
+  </div>
+  <div class="card-body">
+    <p style="white-space:pre-wrap;">{{ msg.body }}</p>
+  </div>
+</div>
+
+<!-- Reply -->
+{% if msg.sender_id != current_user.id %}
+<div class="card">
+  <div class="card-header fw-bold py-2">Reply</div>
+  <div class="card-body">
+    <form method="post" action="{{ url_for('message_send') }}">
+      <input type="hidden" name="recipient_id" value="{{ msg.sender_id }}">
+      <div class="mb-3">
+        <input type="text" name="subject" class="form-control" value="Re: {{ msg.subject }}" required>
+      </div>
+      <div class="mb-3">
+        <textarea name="body" class="form-control" rows="5" required placeholder="Write your reply…"></textarea>
+      </div>
+      <button type="submit" class="btn btn-primary"><i class="bi bi-send me-1"></i>Send Reply</button>
+    </form>
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}
