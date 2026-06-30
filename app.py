@@ -607,6 +607,76 @@ def api_unread_count():
     return jsonify({'count': count})
 
 
+# ── Calendar ──────────────────────────────────────────────────────────────────
+
+@app.route('/calendar')
+@login_required
+def calendar_view():
+    return render_template('calendar.html')
+
+
+@app.route('/api/calendar/events')
+@login_required
+def calendar_events():
+    events = []
+
+    # School activities with a follow-up date
+    activities = Activity.query.filter(Activity.follow_up_date != None).all()
+    type_colors = {
+        'call':    '#0d6efd',
+        'meeting': '#6f42c1',
+        'email':   '#0dcaf0',
+        'note':    '#6c757d',
+    }
+    for a in activities:
+        label = a.next_action or a.outcome or a.type.capitalize()
+        school_name = a.school.name if a.school else ''
+        events.append({
+            'id': f'act-{a.id}',
+            'title': f'{school_name} — {label}',
+            'start': a.follow_up_date.isoformat(),
+            'color': '#dc3545' if (not a.follow_up_complete and a.follow_up_date < date.today()) else type_colors.get(a.type, '#6c757d'),
+            'url': url_for('school_detail', school_id=a.school_id),
+            'extendedProps': {
+                'type': a.type,
+                'complete': a.follow_up_complete,
+                'notes': a.notes or '',
+            }
+        })
+
+    # Parent events (birthday parties, holiday camps etc.)
+    parents = Parent.query.filter(Parent.event_date != None).all()
+    parent_colors = {
+        'Birthday Party': '#fd7e14',
+        'Holiday Camp':   '#20c997',
+        'Assembly':       '#6f42c1',
+    }
+    for p in parents:
+        color = parent_colors.get(p.enquiry_type, '#fd7e14')
+        events.append({
+            'id': f'par-{p.id}',
+            'title': f'🎂 {p.enquiry_type or "Event"} — {p.child_name or p.name}',
+            'start': p.event_date.isoformat(),
+            'color': color,
+            'url': url_for('parent_detail', parent_id=p.id),
+            'extendedProps': {'type': p.enquiry_type, 'notes': p.notes or ''}
+        })
+
+    # School assembly dates
+    schools_with_assembly = School.query.filter(School.assembly_date != None).all()
+    for s in schools_with_assembly:
+        events.append({
+            'id': f'asm-{s.id}',
+            'title': f'🏫 Assembly — {s.name}',
+            'start': s.assembly_date.isoformat(),
+            'color': '#6f42c1',
+            'url': url_for('school_detail', school_id=s.id),
+            'extendedProps': {'type': 'Assembly', 'notes': ''}
+        })
+
+    return jsonify(events)
+
+
 # ── Reminders API ─────────────────────────────────────────────────────────────
 
 @app.route('/api/reminders')

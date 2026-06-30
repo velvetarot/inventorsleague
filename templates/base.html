@@ -42,6 +42,9 @@
     <a href="{{ url_for('parents') }}" class="{% if 'parent' in request.endpoint %}active{% endif %}">
       <i class="bi bi-person-heart me-2"></i>Parents
     </a>
+    <a href="{{ url_for('calendar_view') }}" class="{% if request.endpoint == 'calendar_view' %}active{% endif %}">
+      <i class="bi bi-calendar3 me-2"></i>Calendar
+    </a>
     <a href="{{ url_for('pipeline') }}" class="{% if request.endpoint == 'pipeline' %}active{% endif %}">
       <i class="bi bi-kanban me-2"></i>Pipeline
     </a>

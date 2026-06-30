@@ -1,0 +1,75 @@
+{% extends 'base.html' %}
+{% block title %}Calendar{% endblock %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h4 class="fw-bold mb-0">Calendar</h4>
+  <div class="d-flex gap-3 align-items-center flex-wrap">
+    <span><span style="background:#0d6efd;display:inline-block;width:12px;height:12px;border-radius:2px;" class="me-1"></span>Call follow-up</span>
+    <span><span style="background:#6f42c1;display:inline-block;width:12px;height:12px;border-radius:2px;" class="me-1"></span>Meeting / Assembly</span>
+    <span><span style="background:#fd7e14;display:inline-block;width:12px;height:12px;border-radius:2px;" class="me-1"></span>Birthday Party</span>
+    <span><span style="background:#20c997;display:inline-block;width:12px;height:12px;border-radius:2px;" class="me-1"></span>Holiday Camp</span>
+    <span><span style="background:#dc3545;display:inline-block;width:12px;height:12px;border-radius:2px;" class="me-1"></span>Overdue</span>
+  </div>
+</div>
+
+<div class="card p-3">
+  <div id="calendar"></div>
+</div>
+
+<!-- Event detail popover -->
+<div class="modal fade" id="eventModal" tabindex="-1">
+  <div class="modal-dialog modal-sm">
+    <div class="modal-content">
+      <div class="modal-header py-2">
+        <h6 class="modal-title fw-bold" id="eventModalTitle"></h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p class="text-muted small mb-1" id="eventModalType"></p>
+        <p class="small mb-0" id="eventModalNotes"></p>
+      </div>
+      <div class="modal-footer py-2">
+        <a id="eventModalLink" href="#" class="btn btn-sm btn-primary">Open Record</a>
+        <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+{% block scripts %}
+<link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const calendarEl = document.getElementById('calendar');
+  const calendar = new FullCalendar.Calendar(calendarEl, {
+    initialView: 'dayGridMonth',
+    headerToolbar: {
+      left: 'prev,next today',
+      center: 'title',
+      right: 'dayGridMonth,timeGridWeek,listMonth'
+    },
+    height: 'auto',
+    events: '/api/calendar/events',
+    eventClick: function(info) {
+      info.jsEvent.preventDefault();
+      const p = info.event.extendedProps;
+      document.getElementById('eventModalTitle').textContent = info.event.title;
+      document.getElementById('eventModalType').textContent = p.type ? p.type.charAt(0).toUpperCase() + p.type.slice(1) : '';
+      document.getElementById('eventModalNotes').textContent = p.notes || '';
+      document.getElementById('eventModalLink').href = info.event.url || '#';
+      new bootstrap.Modal(document.getElementById('eventModal')).show();
+    },
+    eventDidMount: function(info) {
+      if (info.event.extendedProps.complete) {
+        info.el.style.opacity = '0.5';
+        info.el.style.textDecoration = 'line-through';
+      }
+    }
+  });
+  calendar.render();
+});
+</script>
+{% endblock %}
