@@ -68,9 +68,9 @@
     <div class="mt-auto p-3 border-top border-secondary">
       <div class="mb-2">
         <small class="text-muted d-block" style="font-size:.7rem; text-transform:uppercase; letter-spacing:.05em;">Online</small>
-        <span style="font-size:.8rem;"><span style="color:#28a745;">●</span> {{ current_user.name }} <span class="text-muted">(you)</span></span>
+        <span style="font-size:.8rem;"><span style="color:#28a745;">●</span> <span style="color:#ffc107;font-weight:600;">{{ current_user.name }}</span> <span class="text-muted">(you)</span></span>
         {% for u in online_users %}
-        <br><span style="font-size:.8rem;"><span style="color:#28a745;">●</span> {{ u.name }}</span>
+        <br><span style="font-size:.8rem;"><span style="color:#28a745;">●</span> <span style="color:#ffc107;font-weight:600;">{{ u.name }}</span></span>
         {% endfor %}
       </div>
       <a href="{{ url_for('logout') }}" class="text-muted small"><i class="bi bi-box-arrow-right me-1"></i>Log out</a>
