@@ -1,0 +1,103 @@
+{% extends 'base.html' %}
+{% block title %}Today's Activity{% endblock %}
+{% block content %}
+
+<h4 class="fw-bold mb-1">Today's Activity</h4>
+<p class="text-muted mb-4">{{ today.strftime('%A, %d %B %Y') }}</p>
+
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3">
+    <div class="card stat-card p-3" style="border-color:#0d6efd">
+      <div class="text-muted small">Calls</div>
+      <div class="fs-3 fw-bold">{{ activities | selectattr('type','eq','call') | list | length }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card stat-card p-3" style="border-color:#0dcaf0">
+      <div class="text-muted small">Emails Sent</div>
+      <div class="fs-3 fw-bold">{{ emails | length }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card stat-card p-3" style="border-color:#6f42c1">
+      <div class="text-muted small">Meetings / Notes</div>
+      <div class="fs-3 fw-bold">{{ activities | rejectattr('type','eq','call') | list | length }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card stat-card p-3" style="border-color:#198754">
+      <div class="text-muted small">Total Actions</div>
+      <div class="fs-3 fw-bold">{{ activities | length + emails | length }}</div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4">
+  <div class="col-lg-7">
+    <div class="card">
+      <div class="card-header fw-bold py-2"><i class="bi bi-telephone me-1"></i> Calls & Activities Today ({{ activities | length }})</div>
+      {% if activities %}
+      <ul class="list-group list-group-flush">
+        {% for act in activities %}
+        {% set icon_map = {'call': 'bi-telephone', 'email': 'bi-envelope', 'meeting': 'bi-people', 'note': 'bi-sticky'} %}
+        {% set color_map = {'call': 'bg-primary', 'email': 'bg-info', 'meeting': 'bg-warning', 'note': 'bg-secondary'} %}
+        <li class="list-group-item">
+          <div class="d-flex align-items-start gap-2">
+            <div class="activity-icon text-white {{ color_map.get(act.type, 'bg-secondary') }} flex-shrink-0 mt-1">
+              <i class="bi {{ icon_map.get(act.type, 'bi-dot') }}"></i>
+            </div>
+            <div class="flex-grow-1">
+              <div class="d-flex justify-content-between align-items-start">
+                <a href="{{ url_for('school_detail', school_id=act.school_id) }}" class="fw-semibold text-decoration-none">{{ act.school.name }}</a>
+                <span class="text-muted small">{{ act.created_at.strftime('%H:%M') }}{% if act.user %} · {{ act.user.name }}{% endif %}</span>
+              </div>
+              <div class="small">
+                <span class="text-capitalize text-muted">{{ act.type }}</span>
+                {% if act.outcome %}<span class="badge bg-light text-dark ms-1">{{ act.outcome }}</span>{% endif %}
+              </div>
+              {% if act.notes %}<div class="text-muted" style="font-size:.82rem;">{{ act.notes[:120] }}</div>{% endif %}
+              {% if act.next_action %}<div class="text-muted small"><i class="bi bi-arrow-right me-1"></i>{{ act.next_action }}</div>{% endif %}
+            </div>
+          </div>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <div class="card-body text-muted">No calls or activities logged today yet.</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="col-lg-5">
+    <div class="card">
+      <div class="card-header fw-bold py-2"><i class="bi bi-envelope me-1"></i> Emails Sent Today ({{ emails | length }})</div>
+      {% if emails %}
+      <ul class="list-group list-group-flush">
+        {% for email in emails %}
+        {% set status_color = {'delivered': 'success', 'opened': 'primary', 'clicked': 'info', 'bounced': 'danger', 'sent': 'secondary'} %}
+        <li class="list-group-item">
+          <div class="d-flex justify-content-between align-items-start">
+            <div>
+              {% if email.school_id %}
+              <a href="{{ url_for('school_detail', school_id=email.school_id) }}" class="fw-semibold text-decoration-none small">{{ email.to_name or email.to_email }}</a>
+              {% else %}
+              <span class="fw-semibold small">{{ email.to_name or email.to_email }}</span>
+              {% endif %}
+              <div class="text-muted" style="font-size:.82rem;">{{ email.subject[:60] }}</div>
+            </div>
+            <div class="text-end">
+              <span class="badge bg-{{ status_color.get(email.status, 'secondary') }}">{{ email.status | title }}</span>
+              <div class="text-muted" style="font-size:.75rem;">{{ email.sent_at.strftime('%H:%M') }}</div>
+            </div>
+          </div>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <div class="card-body text-muted">No emails sent today yet.</div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+{% endblock %}

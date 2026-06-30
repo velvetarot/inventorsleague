@@ -96,6 +96,21 @@ def dashboard():
                            due_soon=due_soon, recent=recent, stats=stats, today=today)
 
 
+# ── Today's Activity ──────────────────────────────────────────────────────────
+
+@app.route('/today')
+@login_required
+def today_activity():
+    today = date.today()
+    activities = Activity.query.filter(
+        db.func.date(Activity.created_at) == today
+    ).join(School).order_by(Activity.created_at.desc()).all()
+    emails = EmailLog.query.filter(
+        db.func.date(EmailLog.sent_at) == today
+    ).order_by(EmailLog.sent_at.desc()).all()
+    return render_template('today.html', activities=activities, emails=emails, today=today)
+
+
 # ── Schools ───────────────────────────────────────────────────────────────────
 
 @app.route('/schools')

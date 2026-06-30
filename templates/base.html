@@ -31,6 +31,9 @@
     <a href="{{ url_for('dashboard') }}" class="{% if request.endpoint == 'dashboard' %}active{% endif %}">
       <i class="bi bi-speedometer2 me-2"></i>Dashboard
     </a>
+    <a href="{{ url_for('today_activity') }}" class="{% if request.endpoint == 'today_activity' %}active{% endif %}">
+      <i class="bi bi-calendar-day me-2"></i>Today's Activity
+    </a>
     <a href="{{ url_for('schools') }}" class="{% if 'school' in request.endpoint %}active{% endif %}">
       <i class="bi bi-building me-2"></i>Schools
     </a>
