@@ -49,11 +49,12 @@
             <div class="flex-grow-1">
               <div class="d-flex justify-content-between align-items-start">
                 <a href="{{ url_for('school_detail', school_id=act.school_id) }}" class="fw-semibold text-decoration-none">{{ act.school.name }}</a>
-                <span class="text-muted small">{{ act.created_at.strftime('%H:%M') }}{% if act.user %} · {{ act.user.name }}{% endif %}</span>
+                <span class="text-muted small fw-semibold">{{ act.created_at.strftime('%H:%M') }}{% if act.user %} · {{ act.user.name }}{% endif %}</span>
               </div>
               <div class="small">
                 <span class="text-capitalize text-muted">{{ act.type }}</span>
                 {% if act.outcome %}<span class="badge bg-light text-dark ms-1">{{ act.outcome }}</span>{% endif %}
+                <span class="text-muted ms-2" style="font-size:.75rem;"><i class="bi bi-clock me-1"></i>Last activity: {{ act.created_at.strftime('%d %b %Y %H:%M') }}</span>
               </div>
               {% if act.notes %}<div class="text-muted" style="font-size:.82rem;">{{ act.notes[:120] }}</div>{% endif %}
               {% if act.next_action %}<div class="text-muted small"><i class="bi bi-arrow-right me-1"></i>{{ act.next_action }}</div>{% endif %}

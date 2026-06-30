@@ -81,8 +81,10 @@
         <td class="text-muted small">{% if s.term_revenue %}£{{ '{:,.0f}'.format(s.term_revenue) }}{% else %}—{% endif %}</td>
         <td><span class="text-muted small">{{ s.after_school_club_status or '—' }}</span></td>
         <td class="text-muted small">
-          {% set la = s.last_activity %}
-          {% if la %}{{ la.created_at.strftime('%d %b') }}{% else %}Never{% endif %}
+          {% if s.last_contacted %}
+            {{ s.last_contacted.strftime('%d %b %Y') }}<br>
+            <span style="font-size:.75rem;">{{ s.last_contacted.strftime('%H:%M') }}</span>
+          {% else %}Never{% endif %}
         </td>
         <td>
           <a href="{{ url_for('activity_new', school_id=s.id) }}" class="btn btn-sm btn-outline-primary">

@@ -302,6 +302,7 @@ def activity_new(school_id):
         db.session.add(activity)
 
         # Update school pipeline fields from the form
+        school.last_contacted = datetime.utcnow()
         if request.form.get('stage'):
             school.stage = request.form['stage']
         if request.form.get('club_status'):
@@ -546,6 +547,12 @@ def email_send():
         status='sent' if message_id else 'error',
     )
     db.session.add(log)
+
+    # Stamp last_contacted on the school
+    if message_id and school_id:
+        school_obj = School.query.get(school_id)
+        if school_obj:
+            school_obj.last_contacted = datetime.utcnow()
 
     # Auto-create a follow-up activity 3 working days from today for school emails
     if message_id and school_id:
@@ -1064,6 +1071,7 @@ def migrate_db():
         ('schools', 'school_notes',           'TEXT'),
         ('users',   'last_seen',              'TIMESTAMP'),
         ('users',   'role',                   "VARCHAR(20) DEFAULT 'user'"),
+        ('schools', 'last_contacted',         'TIMESTAMP'),
     ]
     with db.engine.connect() as conn:
         for table, column, col_type in migrations:
