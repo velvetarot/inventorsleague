@@ -40,6 +40,29 @@ def load_user(user_id):
     return User.query.get(int(user_id))
 
 
+# ── Role decorators ───────────────────────────────────────────────────────────
+
+from functools import wraps
+
+def admin_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not current_user.is_authenticated or not current_user.is_admin:
+            flash('Admin access required.', 'danger')
+            return redirect(url_for('dashboard'))
+        return f(*args, **kwargs)
+    return decorated
+
+def delete_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not current_user.is_authenticated or not current_user.can_delete:
+            flash('You do not have permission to delete records.', 'danger')
+            return redirect(request.referrer or url_for('dashboard'))
+        return f(*args, **kwargs)
+    return decorated
+
+
 # ── Online presence ───────────────────────────────────────────────────────────
 
 @app.before_request
@@ -456,6 +479,7 @@ def attachment_download(attachment_id):
 
 @app.route('/attachments/<int:attachment_id>/delete', methods=['POST'])
 @login_required
+@delete_required
 def attachment_delete(attachment_id):
     att = Attachment.query.get_or_404(attachment_id)
     parent_id = att.parent_id
@@ -793,6 +817,7 @@ def email_template_json(template_id):
 
 @app.route('/email/log/<int:log_id>/delete', methods=['POST'])
 @login_required
+@delete_required
 def email_log_delete(log_id):
     em = EmailLog.query.get_or_404(log_id)
     school_id = em.school_id
@@ -851,6 +876,7 @@ def brevo_webhook():
 
 @app.route('/admin/import', methods=['GET', 'POST'])
 @login_required
+@admin_required
 def admin_import():
     if request.method == 'POST':
         if 'file' not in request.files or request.files['file'].filename == '':
@@ -871,20 +897,46 @@ def admin_import():
 
 @app.route('/admin/users', methods=['GET', 'POST'])
 @login_required
+@admin_required
 def admin_users():
     if request.method == 'POST':
-        existing = User.query.filter_by(email=request.form['email'].strip().lower()).first()
-        if existing:
-            flash('Email already exists.', 'danger')
-        else:
-            user = User(
-                name=request.form['name'],
-                email=request.form['email'].strip().lower(),
-            )
-            user.set_password(request.form['password'])
-            db.session.add(user)
+        action = request.form.get('action')
+        if action == 'create':
+            existing = User.query.filter_by(email=request.form['email'].strip().lower()).first()
+            if existing:
+                flash('Email already exists.', 'danger')
+            else:
+                user = User(
+                    name=request.form['name'],
+                    email=request.form['email'].strip().lower(),
+                    role=request.form.get('role', 'user'),
+                )
+                user.set_password(request.form['password'])
+                db.session.add(user)
+                db.session.commit()
+                flash(f'User {user.name} created.', 'success')
+        elif action == 'update_role':
+            user = User.query.get_or_404(request.form.get('user_id', type=int))
+            if user.id == current_user.id:
+                flash('You cannot change your own role.', 'danger')
+            else:
+                user.role = request.form.get('role', 'user')
+                db.session.commit()
+                flash(f'{user.name} role updated to {user.role}.', 'success')
+        elif action == 'delete':
+            user = User.query.get_or_404(request.form.get('user_id', type=int))
+            if user.id == current_user.id:
+                flash('You cannot delete yourself.', 'danger')
+            else:
+                db.session.delete(user)
+                db.session.commit()
+                flash(f'User deleted.', 'success')
+        elif action == 'reset_password':
+            user = User.query.get_or_404(request.form.get('user_id', type=int))
+            user.set_password(request.form.get('new_password'))
             db.session.commit()
-            flash(f'User {user.name} created.', 'success')
+            flash(f'Password reset for {user.name}.', 'success')
+        return redirect(url_for('admin_users'))
     users = User.query.order_by(User.name).all()
     return render_template('auth/users.html', users=users)
 
@@ -899,6 +951,7 @@ def migrate_db():
         ('schools', 'stage',                  "VARCHAR(50) DEFAULT 'New'"),
         ('schools', 'school_notes',           'TEXT'),
         ('users',   'last_seen',              'TIMESTAMP'),
+        ('users',   'role',                   "VARCHAR(20) DEFAULT 'user'"),
     ]
     with db.engine.connect() as conn:
         for table, column, col_type in migrations:

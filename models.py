@@ -13,6 +13,7 @@ class User(UserMixin, db.Model):
     email = db.Column(db.String(150), unique=True, nullable=False)
     password_hash = db.Column(db.String(256))
     last_seen = db.Column(db.DateTime)
+    role = db.Column(db.String(20), default='user')  # admin / manager / user
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     def set_password(self, password):
@@ -25,7 +26,23 @@ class User(UserMixin, db.Model):
     def is_online(self):
         if not self.last_seen:
             return False
-        return (datetime.utcnow() - self.last_seen).total_seconds() < 300  # 5 mins
+        return (datetime.utcnow() - self.last_seen).total_seconds() < 300
+
+    @property
+    def is_admin(self):
+        return self.role == 'admin'
+
+    @property
+    def is_manager(self):
+        return self.role in ('admin', 'manager')
+
+    @property
+    def can_delete(self):
+        return self.role in ('admin', 'manager')
+
+    @property
+    def can_manage_users(self):
+        return self.role == 'admin'
 
 
 class Message(db.Model):

@@ -1,15 +1,22 @@
 {% extends 'base.html' %}
 {% block title %}Users{% endblock %}
 {% block content %}
+
+{% set role_colors = {'admin': 'danger', 'manager': 'warning', 'user': 'secondary'} %}
+{% set role_labels = {'admin': 'Admin', 'manager': 'Manager', 'user': 'User'} %}
+
 <div class="d-flex justify-content-between align-items-center mb-4">
   <h4 class="fw-bold mb-0">Team Members</h4>
 </div>
 
 <div class="row g-4">
-  <div class="col-md-5">
+
+  <!-- Add new user -->
+  <div class="col-md-4">
     <div class="card p-4">
       <h6 class="fw-bold mb-3">Add New User</h6>
       <form method="post">
+        <input type="hidden" name="action" value="create">
         <div class="mb-3">
           <label class="form-label">Name</label>
           <input type="text" name="name" class="form-control" required>
@@ -22,25 +29,145 @@
           <label class="form-label">Password</label>
           <input type="password" name="password" class="form-control" required minlength="8">
         </div>
-        <button type="submit" class="btn btn-primary">Create User</button>
+        <div class="mb-3">
+          <label class="form-label">Role</label>
+          <select name="role" class="form-select">
+            <option value="user">User — view & log activities, send emails</option>
+            <option value="manager">Manager — + can delete records</option>
+            <option value="admin">Admin — full access including user management</option>
+          </select>
+          <div class="form-text">Choose carefully — Admin can add and delete users.</div>
+        </div>
+        <button type="submit" class="btn btn-primary w-100">Create User</button>
       </form>
     </div>
   </div>
-  <div class="col-md-7">
+
+  <!-- User list -->
+  <div class="col-md-8">
     <div class="card">
-      <table class="table mb-0">
-        <thead><tr><th>Name</th><th>Email</th><th>Joined</th></tr></thead>
+      <table class="table mb-0 align-middle">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Email</th>
+            <th>Role</th>
+            <th>Status</th>
+            <th>Joined</th>
+            <th></th>
+          </tr>
+        </thead>
         <tbody>
         {% for u in users %}
         <tr>
-          <td>{{ u.name }}</td>
-          <td>{{ u.email }}</td>
-          <td>{{ u.created_at.strftime('%d %b %Y') }}</td>
+          <td class="fw-semibold">{{ u.name }}</td>
+          <td class="text-muted small">{{ u.email }}</td>
+          <td>
+            <span class="badge bg-{{ role_colors.get(u.role or 'user', 'secondary') }}">
+              {{ role_labels.get(u.role or 'user', 'User') }}
+            </span>
+          </td>
+          <td>
+            {% if u.is_online %}
+            <span style="color:#28a745;">●</span> <span class="small">Online</span>
+            {% elif u.last_seen %}
+            <span class="text-muted small">{{ u.last_seen.strftime('%d %b %H:%M') }}</span>
+            {% else %}
+            <span class="text-muted small">Never</span>
+            {% endif %}
+          </td>
+          <td class="text-muted small">{{ u.created_at.strftime('%d %b %Y') }}</td>
+          <td>
+            {% if u.id != current_user.id %}
+            <div class="d-flex gap-1">
+              <!-- Change role -->
+              <button class="btn btn-sm btn-outline-secondary" title="Change role"
+                data-bs-toggle="modal" data-bs-target="#roleModal{{ u.id }}">
+                <i class="bi bi-shield"></i>
+              </button>
+              <!-- Reset password -->
+              <button class="btn btn-sm btn-outline-secondary" title="Reset password"
+                data-bs-toggle="modal" data-bs-target="#pwModal{{ u.id }}">
+                <i class="bi bi-key"></i>
+              </button>
+              <!-- Delete -->
+              <form method="post" onsubmit="return confirm('Delete {{ u.name }}? This cannot be undone.')">
+                <input type="hidden" name="action" value="delete">
+                <input type="hidden" name="user_id" value="{{ u.id }}">
+                <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+              </form>
+            </div>
+            {% else %}
+            <span class="text-muted small">(you)</span>
+            {% endif %}
+          </td>
         </tr>
         {% endfor %}
         </tbody>
       </table>
     </div>
+
+    <div class="card mt-3 p-3">
+      <div class="fw-semibold mb-2">Role Permissions</div>
+      <table class="table table-sm mb-0">
+        <thead><tr><th>Permission</th><th class="text-center">User</th><th class="text-center">Manager</th><th class="text-center">Admin</th></tr></thead>
+        <tbody>
+          <tr><td>View schools & activities</td><td class="text-center text-success">✓</td><td class="text-center text-success">✓</td><td class="text-center text-success">✓</td></tr>
+          <tr><td>Log calls, emails, notes</td><td class="text-center text-success">✓</td><td class="text-center text-success">✓</td><td class="text-center text-success">✓</td></tr>
+          <tr><td>Send emails</td><td class="text-center text-success">✓</td><td class="text-center text-success">✓</td><td class="text-center text-success">✓</td></tr>
+          <tr><td>Delete records & emails</td><td class="text-center text-danger">✗</td><td class="text-center text-success">✓</td><td class="text-center text-success">✓</td></tr>
+          <tr><td>Add / delete users</td><td class="text-center text-danger">✗</td><td class="text-center text-danger">✗</td><td class="text-center text-success">✓</td></tr>
+          <tr><td>Import data</td><td class="text-center text-danger">✗</td><td class="text-center text-danger">✗</td><td class="text-center text-success">✓</td></tr>
+        </tbody>
+      </table>
+    </div>
   </div>
 </div>
+
+<!-- Role modals -->
+{% for u in users %}{% if u.id != current_user.id %}
+<div class="modal fade" id="roleModal{{ u.id }}" tabindex="-1">
+  <div class="modal-dialog modal-sm">
+    <div class="modal-content">
+      <form method="post">
+        <input type="hidden" name="action" value="update_role">
+        <input type="hidden" name="user_id" value="{{ u.id }}">
+        <div class="modal-header"><h6 class="modal-title">Change Role — {{ u.name }}</h6>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body">
+          <select name="role" class="form-select">
+            <option value="user" {% if (u.role or 'user')=='user' %}selected{% endif %}>User</option>
+            <option value="manager" {% if u.role=='manager' %}selected{% endif %}>Manager</option>
+            <option value="admin" {% if u.role=='admin' %}selected{% endif %}>Admin</option>
+          </select>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary btn-sm">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+<div class="modal fade" id="pwModal{{ u.id }}" tabindex="-1">
+  <div class="modal-dialog modal-sm">
+    <div class="modal-content">
+      <form method="post">
+        <input type="hidden" name="action" value="reset_password">
+        <input type="hidden" name="user_id" value="{{ u.id }}">
+        <div class="modal-header"><h6 class="modal-title">Reset Password — {{ u.name }}</h6>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body">
+          <input type="password" name="new_password" class="form-control" placeholder="New password" required minlength="8">
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary btn-sm">Reset</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endif %}{% endfor %}
+
 {% endblock %}
