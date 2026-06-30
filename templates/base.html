@@ -42,8 +42,17 @@
     <a href="{{ url_for('parents') }}" class="{% if 'parent' in request.endpoint %}active{% endif %}">
       <i class="bi bi-person-heart me-2"></i>Parents
     </a>
-    <a href="{{ url_for('email_templates') }}" class="{% if 'email' in request.endpoint %}active{% endif %}">
-      <i class="bi bi-envelope-paper me-2"></i>Email Templates
+    <a href="{{ url_for('pipeline') }}" class="{% if request.endpoint == 'pipeline' %}active{% endif %}">
+      <i class="bi bi-kanban me-2"></i>Pipeline
+    </a>
+    <a href="{{ url_for('bulk_email') }}" class="{% if request.endpoint == 'bulk_email' %}active{% endif %}">
+      <i class="bi bi-envelope-paper me-2"></i>Bulk Email
+    </a>
+    <a href="{{ url_for('reports') }}" class="{% if request.endpoint == 'reports' %}active{% endif %}">
+      <i class="bi bi-bar-chart me-2"></i>Reports
+    </a>
+    <a href="{{ url_for('email_templates') }}" class="{% if request.endpoint == 'email_templates' %}active{% endif %}">
+      <i class="bi bi-file-text me-2"></i>Email Templates
     </a>
     <a href="{{ url_for('admin_users') }}" class="{% if request.endpoint == 'admin_users' %}active{% endif %}">
       <i class="bi bi-people me-2"></i>Users
@@ -56,6 +65,16 @@
   {% endif %}
 
   <div class="flex-grow-1 p-4" style="min-width:0;">
+    {% if current_user.is_authenticated %}
+    {% set overdue_count = namespace(n=0) %}
+    {% set due_count = namespace(n=0) %}
+    {# Follow-up reminder banner — injected via JS fetch to avoid slow DB call on every page #}
+    <div id="followup-banner" style="display:none;" class="alert alert-warning alert-dismissible mb-3 py-2">
+      <i class="bi bi-bell-fill me-2"></i><span id="followup-banner-text"></span>
+      <a href="{{ url_for('dashboard') }}" class="alert-link ms-2">View Dashboard</a>
+      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    {% endif %}
     {% for cat, msg in get_flashed_messages(with_categories=true) %}
     <div class="alert alert-{{ cat }} alert-dismissible fade show" role="alert">
       {{ msg }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
@@ -66,6 +85,19 @@
   </div>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+{% if current_user.is_authenticated %}
+<script>
+fetch('/api/reminders').then(r=>r.json()).then(d=>{
+  if(d.overdue > 0 || d.due_today > 0){
+    let msg = [];
+    if(d.overdue > 0) msg.push(d.overdue + ' overdue follow-up' + (d.overdue>1?'s':''));
+    if(d.due_today > 0) msg.push(d.due_today + ' follow-up' + (d.due_today>1?'s':'')+' due today');
+    document.getElementById('followup-banner-text').textContent = msg.join(' · ');
+    document.getElementById('followup-banner').style.display = '';
+  }
+});
+</script>
+{% endif %}
 {% block scripts %}{% endblock %}
 </body>
 </html>

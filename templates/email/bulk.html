@@ -1,0 +1,147 @@
+{% extends 'base.html' %}
+{% block title %}Bulk Email{% endblock %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h4 class="fw-bold mb-0">Bulk Email</h4>
+</div>
+
+<form method="post">
+<div class="row g-4">
+
+  <!-- Left: filters + school list -->
+  <div class="col-lg-5">
+    <div class="card p-3 mb-3">
+      <div class="fw-semibold mb-2">Filter Schools</div>
+      <div class="row g-2">
+        <div class="col-6">
+          <select name="tier_filter" class="form-select form-select-sm" onchange="applyFilters(this)">
+            <option value="">All Tiers</option>
+            <option value="A" {% if tier=='A' %}selected{% endif %}>A — Call Now</option>
+            <option value="B" {% if tier=='B' %}selected{% endif %}>B — Call This Week</option>
+            <option value="C" {% if tier=='C' %}selected{% endif %}>C — Keep Warm</option>
+            <option value="D" {% if tier=='D' %}selected{% endif %}>D — Low Priority</option>
+          </select>
+        </div>
+        <div class="col-6">
+          <select name="stage_filter" class="form-select form-select-sm" onchange="applyFilters(this)">
+            <option value="">All Stages</option>
+            {% for s in stages %}
+            <option {% if stage==s %}selected{% endif %}>{{ s }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header py-2 d-flex justify-content-between align-items-center">
+        <span class="fw-semibold">Schools <span class="text-muted fw-normal">({{ schools|length }})</span></span>
+        <div class="d-flex gap-2">
+          <button type="button" class="btn btn-outline-secondary btn-sm" onclick="selectAll(true)">All</button>
+          <button type="button" class="btn btn-outline-secondary btn-sm" onclick="selectAll(false)">None</button>
+        </div>
+      </div>
+      <div style="max-height:420px;overflow-y:auto;">
+        <ul class="list-group list-group-flush">
+          {% for school in schools %}
+          <li class="list-group-item py-1 px-3">
+            <div class="form-check">
+              <input class="form-check-input school-check" type="checkbox" name="school_ids" value="{{ school.id }}"
+                id="s{{ school.id }}" {% if not school.main_email %}disabled{% endif %}>
+              <label class="form-check-label small" for="s{{ school.id }}">
+                {{ school.name }}
+                {% if not school.main_email %}<span class="text-danger">(no email)</span>{% endif %}
+                {% if school.priority_tier %}<span class="badge badge-tier-{{ school.priority_tier }} ms-1" style="font-size:.65rem;">{{ school.priority_tier }}</span>{% endif %}
+              </label>
+            </div>
+          </li>
+          {% endfor %}
+          {% if not schools %}
+          <li class="list-group-item text-muted small">No schools match the filter.</li>
+          {% endif %}
+        </ul>
+      </div>
+      <div class="card-footer py-2 text-muted small" id="selected-count">0 selected</div>
+    </div>
+  </div>
+
+  <!-- Right: compose -->
+  <div class="col-lg-7">
+    <div class="card p-4">
+      <div class="mb-3">
+        <label class="form-label fw-semibold">Load Template</label>
+        <div class="d-flex gap-2">
+          <select id="bulk_template_picker" class="form-select">
+            <option value="">— choose a template —</option>
+            {% for t in templates %}
+            <option value="{{ t.id }}">{{ t.name }}</option>
+            {% endfor %}
+          </select>
+          <button type="button" class="btn btn-outline-secondary flex-shrink-0" onclick="loadBulkTemplate()">Load</button>
+        </div>
+      </div>
+      <input type="hidden" name="template_name" id="bulk_template_name">
+      <div class="mb-3">
+        <label class="form-label fw-semibold">Subject</label>
+        <input type="text" name="subject" id="bulk_subject" class="form-control" required
+          placeholder="e.g. After-school clubs at {{school_name}}">
+      </div>
+      <div class="mb-2">
+        <label class="form-label fw-semibold">Message</label>
+        <textarea name="body_html" id="bulk_body" class="form-control font-monospace" rows="14" required></textarea>
+      </div>
+      <div class="form-text mb-3">
+        <i class="bi bi-info-circle me-1"></i>
+        Use <code>{{school_name}}</code>, <code>{{headteacher}}</code>, <code>{{city}}</code> — merged individually per school.
+      </div>
+      <button type="submit" class="btn btn-primary" onclick="return confirmSend()">
+        <i class="bi bi-send me-1"></i>Send to Selected Schools
+      </button>
+    </div>
+  </div>
+
+</div>
+</form>
+
+{% endblock %}
+{% block scripts %}
+<script>
+function applyFilters(el) {
+  const params = new URLSearchParams(window.location.search);
+  if (el.name === 'tier_filter') params.set('tier', el.value);
+  if (el.name === 'stage_filter') params.set('stage', el.value);
+  window.location = '/email/bulk?' + params.toString();
+}
+
+function selectAll(checked) {
+  document.querySelectorAll('.school-check:not(:disabled)').forEach(c => c.checked = checked);
+  updateCount();
+}
+
+function updateCount() {
+  const n = document.querySelectorAll('.school-check:checked').length;
+  document.getElementById('selected-count').textContent = n + ' selected';
+}
+document.querySelectorAll('.school-check').forEach(c => c.addEventListener('change', updateCount));
+updateCount();
+
+function loadBulkTemplate() {
+  const id = document.getElementById('bulk_template_picker').value;
+  if (!id) return;
+  fetch('/email/templates/' + id + '/json')
+    .then(r => r.json())
+    .then(t => {
+      document.getElementById('bulk_subject').value = t.subject;
+      document.getElementById('bulk_body').value = t.body_html;
+      document.getElementById('bulk_template_name').value = t.name;
+    });
+}
+
+function confirmSend() {
+  const n = document.querySelectorAll('.school-check:checked').length;
+  if (n === 0) { alert('Please select at least one school.'); return false; }
+  return confirm('Send this email to ' + n + ' school' + (n>1?'s':'') + '?');
+}
+</script>
+{% endblock %}

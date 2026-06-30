@@ -35,18 +35,25 @@
           </div>
         </div>
 
-        <div class="mb-3">
-          <label class="form-label fw-semibold">Outcome</label>
-          <select name="outcome" class="form-select">
+        <div class="mb-3" id="outcome_group">
+          <label class="form-label fw-semibold">Outcome <span class="text-danger" id="outcome_required_star">*</span></label>
+          <select name="outcome" class="form-select" id="outcome_select">
             <option value="">— select —</option>
-            <option>Interested</option>
-            <option>Not Interested</option>
-            <option>Callback Requested</option>
-            <option>Left Voicemail</option>
-            <option>No Answer</option>
-            <option>Sent Info</option>
-            <option>Meeting Booked</option>
-            <option>Won</option>
+            <optgroup label="Call Outcomes">
+              <option>Interested</option>
+              <option>Callback Requested</option>
+              <option>Left Voicemail</option>
+              <option>No Answer</option>
+              <option>Gatekeeper Blocked</option>
+              <option>Not Interested</option>
+            </optgroup>
+            <optgroup label="Progress">
+              <option>Sent Info</option>
+              <option>Demo Booked</option>
+              <option>Meeting Booked</option>
+              <option>Proposal Sent</option>
+              <option>Won</option>
+            </optgroup>
           </select>
         </div>
 
@@ -55,18 +62,28 @@
           <textarea name="notes" class="form-control" rows="4" placeholder="What was discussed?"></textarea>
         </div>
 
-        <div class="mb-3">
-          <label class="form-label fw-semibold">Next Action</label>
-          <input type="text" name="next_action" class="form-control" placeholder="e.g. Send proposal, Call back Thursday…">
+        <div class="mb-3" id="next_action_group">
+          <label class="form-label fw-semibold">Next Action <span class="text-danger" id="next_required_star">*</span></label>
+          <input type="text" name="next_action" id="next_action" class="form-control" placeholder="e.g. Send proposal, Call back Thursday…">
         </div>
 
         <div class="mb-3">
           <label class="form-label fw-semibold">Follow-up Date</label>
-          <input type="date" name="follow_up_date" class="form-control" style="max-width:200px;">
+          <input type="date" name="follow_up_date" id="follow_up_date" class="form-control" style="max-width:200px;">
         </div>
 
         <hr class="my-3">
         <h6 class="fw-bold text-muted text-uppercase mb-3" style="font-size:.75rem;">Update Pipeline (optional)</h6>
+
+        <div class="mb-3">
+          <label class="form-label">Move Stage To</label>
+          <select name="stage" class="form-select form-select-sm">
+            <option value="">No change (currently: {{ school.stage or 'New' }})</option>
+            {% for s in ['New', 'Contacted', 'Interested', 'Demo Booked', 'Won', 'Lost'] %}
+            <option {% if school.stage == s %}selected{% endif %}>{{ s }}</option>
+            {% endfor %}
+          </select>
+        </div>
 
         <div class="row g-3 mb-3">
           <div class="col-md-6">
@@ -128,4 +145,33 @@
   </div>
 
 </div>
+{% endblock %}
+{% block scripts %}
+<script>
+const typeRadios = document.querySelectorAll('input[name="type"]');
+const outcomeSelect = document.getElementById('outcome_select');
+const nextAction = document.getElementById('next_action');
+const followUpDate = document.getElementById('follow_up_date');
+
+function updateRequired() {
+  const type = document.querySelector('input[name="type"]:checked')?.value;
+  const isCall = (type === 'call');
+  outcomeSelect.required = isCall;
+  nextAction.required = isCall;
+  followUpDate.required = isCall;
+  document.getElementById('outcome_required_star').style.display = isCall ? '' : 'none';
+  document.getElementById('next_required_star').style.display = isCall ? '' : 'none';
+}
+typeRadios.forEach(r => r.addEventListener('change', updateRequired));
+updateRequired();
+
+outcomeSelect.addEventListener('change', function() {
+  const stageSelect = document.querySelector('select[name="stage"]');
+  const map = {'Interested':'Interested','Demo Booked':'Demo Booked','Meeting Booked':'Demo Booked','Won':'Won','Not Interested':'Lost'};
+  const suggested = map[this.value];
+  if (suggested) {
+    for (let opt of stageSelect.options) { if (opt.value === suggested) { opt.selected = true; break; } }
+  }
+});
+</script>
 {% endblock %}

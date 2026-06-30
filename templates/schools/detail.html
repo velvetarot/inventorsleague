@@ -95,13 +95,34 @@
     </div>
 
     {% if school.description %}
-    <div class="card">
+    <div class="card mb-3">
       <div class="card-body">
-        <h6 class="fw-bold mb-2 text-muted text-uppercase" style="font-size:.75rem;">Notes</h6>
+        <h6 class="fw-bold mb-2 text-muted text-uppercase" style="font-size:.75rem;">Zoho Notes</h6>
         <p class="mb-0 small">{{ school.description }}</p>
       </div>
     </div>
     {% endif %}
+
+    <!-- Stage badge -->
+    <div class="card mb-3">
+      <div class="card-body">
+        <h6 class="fw-bold mb-2 text-muted text-uppercase" style="font-size:.75rem;">Stage</h6>
+        {% set stage_colors = {'New':'secondary','Contacted':'primary','Interested':'warning','Demo Booked':'info','Won':'success','Lost':'danger'} %}
+        <span class="badge bg-{{ stage_colors.get(school.stage or 'New', 'secondary') }} fs-6">{{ school.stage or 'New' }}</span>
+      </div>
+    </div>
+
+    <!-- Quick Notes -->
+    <div class="card mb-3">
+      <div class="card-body">
+        <h6 class="fw-bold mb-2 text-muted text-uppercase" style="font-size:.75rem;">Quick Notes</h6>
+        <form method="post" action="{{ url_for('school_quick_note', school_id=school.id) }}">
+          <textarea name="note" class="form-control form-control-sm mb-2" rows="3"
+            placeholder="Jot a quick note about this school…">{{ school.school_notes or '' }}</textarea>
+          <button type="submit" class="btn btn-sm btn-outline-primary w-100">Save Note</button>
+        </form>
+      </div>
+    </div>
 
   </div>
 

@@ -56,6 +56,8 @@ class School(db.Model):
     gatekeeper             = db.Column(db.String(200))
     business_manager_name  = db.Column(db.String(200))
     business_manager_email = db.Column(db.String(150))
+    stage = db.Column(db.String(50), default='New')  # New / Contacted / Interested / Demo Booked / Won / Lost
+    school_notes = db.Column(db.Text)  # quick freetext notes separate from activity log
     won = db.Column(db.Boolean, default=False)
     digital_flyer_sent = db.Column(db.Boolean, default=False)
     physical_flyer_sent = db.Column(db.Boolean, default=False)

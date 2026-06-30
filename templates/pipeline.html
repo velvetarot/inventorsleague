@@ -1,0 +1,71 @@
+{% extends 'base.html' %}
+{% block title %}Pipeline{% endblock %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h4 class="fw-bold mb-0">Pipeline</h4>
+  <small class="text-muted">Drag schools between stages or use the dropdown on each card</small>
+</div>
+
+{% set stage_colors = {
+  'New': 'secondary',
+  'Contacted': 'primary',
+  'Interested': 'warning',
+  'Demo Booked': 'info',
+  'Won': 'success',
+  'Lost': 'danger'
+} %}
+
+<div class="d-flex gap-3 overflow-auto pb-3" style="align-items:flex-start;">
+  {% for stage in stages %}
+  {% set color = stage_colors.get(stage, 'secondary') %}
+  <div class="flex-shrink-0" style="width:220px;">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <span class="badge bg-{{ color }} fs-6">{{ stage }}</span>
+      <span class="text-muted small">{{ board[stage]|length }}</span>
+    </div>
+    <div class="d-flex flex-column gap-2" id="col-{{ stage|replace(' ','-') }}">
+      {% for school in board[stage] %}
+      <div class="card p-2 shadow-sm">
+        <div class="fw-semibold small">
+          <a href="{{ url_for('school_detail', school_id=school.id) }}" class="text-decoration-none text-dark">{{ school.name }}</a>
+        </div>
+        {% if school.priority_tier %}
+        <span class="badge badge-tier-{{ school.priority_tier }} mt-1" style="width:fit-content;font-size:.7rem;">
+          {{ {'A':'Call Now','B':'Call This Week','C':'Keep Warm','D':'Low Priority'}.get(school.priority_tier, school.priority_tier) }}
+        </span>
+        {% endif %}
+        {% if school.last_activity %}
+        <div class="text-muted mt-1" style="font-size:.72rem;">
+          Last: {{ school.last_activity.created_at.strftime('%d %b') }} — {{ school.last_activity.outcome or school.last_activity.type }}
+        </div>
+        {% endif %}
+        <select class="form-select form-select-sm mt-2 stage-mover" data-id="{{ school.id }}">
+          {% for s in stages %}
+          <option {% if s == (school.stage or 'New') %}selected{% endif %}>{{ s }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% endfor %}
+      {% if not board[stage] %}
+      <div class="text-muted small text-center py-3 border rounded" style="border-style:dashed!important;">Empty</div>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script>
+document.querySelectorAll('.stage-mover').forEach(sel => {
+  sel.addEventListener('change', function() {
+    const fd = new FormData();
+    fd.append('school_id', this.dataset.id);
+    fd.append('stage', this.value);
+    fetch('/pipeline/move', {method:'POST', body:fd})
+      .then(() => location.reload());
+  });
+});
+</script>
+{% endblock %}

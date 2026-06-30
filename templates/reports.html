@@ -1,0 +1,184 @@
+{% extends 'base.html' %}
+{% block title %}Reports{% endblock %}
+{% block content %}
+
+<h4 class="fw-bold mb-4">Reports</h4>
+
+<!-- Top stats row -->
+<div class="row g-3 mb-4">
+  {% set total_calls_today = calls_today | sum(attribute=1) %}
+  <div class="col-6 col-md-3">
+    <div class="card stat-card p-3" style="border-color:#0d6efd">
+      <div class="text-muted small">Calls Today</div>
+      <div class="fs-3 fw-bold">{{ total_calls_today }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card stat-card p-3" style="border-color:#198754">
+      <div class="text-muted small">Won</div>
+      <div class="fs-3 fw-bold">{{ stage_counts.get('Won', 0) }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card stat-card p-3" style="border-color:#ffc107">
+      <div class="text-muted small">Interested</div>
+      <div class="fs-3 fw-bold">{{ stage_counts.get('Interested', 0) }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card stat-card p-3" style="border-color:#dc3545">
+      <div class="text-muted small">Lost</div>
+      <div class="fs-3 fw-bold">{{ stage_counts.get('Lost', 0) }}</div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4">
+
+  <!-- Calls last 7 days chart -->
+  <div class="col-lg-8">
+    <div class="card p-3">
+      <div class="fw-bold mb-3"><i class="bi bi-bar-chart me-1"></i> Calls — Last 7 Days</div>
+      {% set max_count = days | map(attribute='count') | max %}
+      <div class="d-flex align-items-end gap-2" style="height:140px;">
+        {% for day in days %}
+        {% set pct = (day.count / max_count * 100) if max_count > 0 else 0 %}
+        <div class="flex-grow-1 d-flex flex-column align-items-center">
+          <div class="text-muted small mb-1">{{ day.count }}</div>
+          <div class="bg-primary rounded-top w-100" style="height:{{ [pct,4]|max }}%;min-height:4px;"></div>
+          <div class="text-muted mt-1" style="font-size:.7rem;white-space:nowrap;">{{ day.date }}</div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Calls today by user -->
+  <div class="col-lg-4">
+    <div class="card p-3">
+      <div class="fw-bold mb-3"><i class="bi bi-person me-1"></i> Calls Today by User</div>
+      {% if calls_today %}
+      <ul class="list-group list-group-flush">
+        {% for name, count in calls_today %}
+        <li class="list-group-item px-0 d-flex justify-content-between">
+          <span>{{ name }}</span>
+          <span class="badge bg-primary rounded-pill">{{ count }}</span>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <div class="text-muted small">No calls logged today yet.</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Pipeline stage breakdown -->
+  <div class="col-lg-4">
+    <div class="card p-3">
+      <div class="fw-bold mb-3"><i class="bi bi-kanban me-1"></i> Pipeline Stages</div>
+      {% set stage_colors = {'New':'secondary','Contacted':'primary','Interested':'warning','Demo Booked':'info','Won':'success','Lost':'danger'} %}
+      <ul class="list-group list-group-flush">
+        {% for stage, count in stage_counts.items() %}
+        <li class="list-group-item px-0 d-flex justify-content-between align-items-center">
+          <span class="badge bg-{{ stage_colors.get(stage,'secondary') }}">{{ stage }}</span>
+          <span class="fw-semibold">{{ count }}</span>
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+
+  <!-- Call outcome breakdown -->
+  <div class="col-lg-4">
+    <div class="card p-3">
+      <div class="fw-bold mb-3"><i class="bi bi-telephone me-1"></i> Call Outcomes (All Time)</div>
+      {% if outcomes %}
+      <ul class="list-group list-group-flush">
+        {% for outcome, count in outcomes %}
+        <li class="list-group-item px-0 d-flex justify-content-between">
+          <span class="small">{{ outcome or '—' }}</span>
+          <span class="badge bg-secondary rounded-pill">{{ count }}</span>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <div class="text-muted small">No call outcomes recorded yet.</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Email stats -->
+  <div class="col-lg-4">
+    <div class="card p-3">
+      <div class="fw-bold mb-3"><i class="bi bi-envelope me-1"></i> Email Status (All Time)</div>
+      {% set status_colors = {'sent':'secondary','delivered':'success','opened':'primary','clicked':'info','bounced':'danger','error':'danger'} %}
+      {% if email_stats %}
+      <ul class="list-group list-group-flush">
+        {% for status, count in email_stats %}
+        <li class="list-group-item px-0 d-flex justify-content-between align-items-center">
+          <span class="badge bg-{{ status_colors.get(status,'secondary') }}">{{ status | title }}</span>
+          <span class="fw-semibold">{{ count }}</span>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <div class="text-muted small">No emails sent yet.</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- User activity this week -->
+  <div class="col-12">
+    <div class="card p-3">
+      <div class="fw-bold mb-3"><i class="bi bi-people me-1"></i> User Activity This Week</div>
+      {% if user_activity %}
+      <div class="table-responsive">
+        <table class="table table-sm align-middle mb-0">
+          <thead>
+            <tr>
+              <th>User</th>
+              <th class="text-center">Total Actions</th>
+              <th class="text-center">Calls</th>
+              <th class="text-center">Emails</th>
+              <th class="text-center">Other</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for name, total, calls, emails in user_activity %}
+            <tr>
+              <td class="fw-semibold">{{ name }}</td>
+              <td class="text-center"><span class="badge bg-primary rounded-pill">{{ total }}</span></td>
+              <td class="text-center">{{ calls or 0 }}</td>
+              <td class="text-center">{{ emails or 0 }}</td>
+              <td class="text-center">{{ (total - (calls or 0) - (emails or 0)) }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="text-muted small">No activity logged this week yet.</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Tier breakdown -->
+  <div class="col-lg-4">
+    <div class="card p-3">
+      <div class="fw-bold mb-3"><i class="bi bi-funnel me-1"></i> Schools by Tier</div>
+      {% set tier_labels = {'A':'Call Now','B':'Call This Week','C':'Keep Warm','D':'Low Priority'} %}
+      <ul class="list-group list-group-flush">
+        {% for tier, count in tier_counts | sort %}
+        {% if tier %}
+        <li class="list-group-item px-0 d-flex justify-content-between align-items-center">
+          <span><span class="badge badge-tier-{{ tier }} me-2">{{ tier }}</span>{{ tier_labels.get(tier, tier) }}</span>
+          <span class="fw-semibold">{{ count }}</span>
+        </li>
+        {% endif %}
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

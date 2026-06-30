@@ -246,12 +246,15 @@ def activity_new(school_id):
         db.session.add(activity)
 
         # Update school pipeline fields from the form
+        if request.form.get('stage'):
+            school.stage = request.form['stage']
         if request.form.get('club_status'):
             school.after_school_club_status = request.form['club_status']
         if request.form.get('assembly_opportunity'):
             school.assembly_opportunity = request.form['assembly_opportunity']
         if 'won' in request.form:
             school.won = True
+            school.stage = 'Won'
         school.updated_at = datetime.utcnow()
 
         db.session.commit()
@@ -489,6 +492,189 @@ def email_send():
     return redirect(request.referrer)
 
 
+# ── Reminders API ─────────────────────────────────────────────────────────────
+
+@app.route('/api/reminders')
+@login_required
+def api_reminders():
+    today = date.today()
+    overdue = Activity.query.filter(
+        Activity.follow_up_date < today,
+        Activity.follow_up_complete == False
+    ).count()
+    due_today = Activity.query.filter(
+        Activity.follow_up_date == today,
+        Activity.follow_up_complete == False
+    ).count()
+    return jsonify({'overdue': overdue, 'due_today': due_today})
+
+
+# ── Pipeline (Kanban) ─────────────────────────────────────────────────────────
+
+@app.route('/pipeline')
+@login_required
+def pipeline():
+    stages = ['New', 'Contacted', 'Interested', 'Demo Booked', 'Won', 'Lost']
+    board = {}
+    for s in stages:
+        board[s] = School.query.filter(
+            (School.stage == s) | (School.stage == None if s == 'New' else False)
+        ).order_by(School.name).all()
+    # Schools with no stage go into New
+    board['New'] += School.query.filter(School.stage == None).all()
+    return render_template('pipeline.html', board=board, stages=stages)
+
+
+@app.route('/pipeline/move', methods=['POST'])
+@login_required
+def pipeline_move():
+    school = School.query.get_or_404(request.form.get('school_id', type=int))
+    school.stage = request.form.get('stage')
+    db.session.commit()
+    return jsonify({'ok': True})
+
+
+# ── Quick Note ────────────────────────────────────────────────────────────────
+
+@app.route('/schools/<int:school_id>/note', methods=['POST'])
+@login_required
+def school_quick_note(school_id):
+    school = School.query.get_or_404(school_id)
+    note_text = request.form.get('note', '').strip()
+    if note_text:
+        school.school_notes = note_text
+        db.session.commit()
+    return redirect(url_for('school_detail', school_id=school_id))
+
+
+# ── Bulk Email ────────────────────────────────────────────────────────────────
+
+@app.route('/email/bulk', methods=['GET', 'POST'])
+@login_required
+def bulk_email():
+    templates = EmailTemplate.query.order_by(EmailTemplate.name).all()
+    if request.method == 'POST':
+        school_ids = request.form.getlist('school_ids')
+        template_id = request.form.get('template_id', type=int)
+        subject = request.form.get('subject', '').strip()
+        body = request.form.get('body_html', '').strip()
+        template_name = request.form.get('template_name', '')
+
+        sent, failed = 0, 0
+        for sid in school_ids:
+            school = School.query.get(int(sid))
+            if not school or not school.main_email:
+                failed += 1
+                continue
+            # Apply merge fields
+            s = subject.replace('{{school_name}}', school.name or '') \
+                       .replace('{{school_name | upper}}', (school.name or '').upper()) \
+                       .replace('{{headteacher}}', school.headteacher or '') \
+                       .replace('{{city}}', school.city or '')
+            b = body.replace('{{school_name}}', school.name or '') \
+                    .replace('{{school_name | upper}}', (school.name or '').upper()) \
+                    .replace('{{headteacher}}', school.headteacher or '') \
+                    .replace('{{city}}', school.city or '')
+            msg_id, err = send_email(school.main_email, school.name, s, b)
+            log = EmailLog(
+                school_id=school.id,
+                user_id=current_user.id,
+                to_email=school.main_email,
+                to_name=school.name,
+                subject=s,
+                body_html=b,
+                template_name=template_name,
+                status='sent' if msg_id else 'error',
+                brevo_message_id=msg_id,
+                error_message=err,
+            )
+            db.session.add(log)
+            if msg_id:
+                sent += 1
+            else:
+                failed += 1
+        db.session.commit()
+        flash(f'Bulk email complete: {sent} sent, {failed} failed.', 'success' if not failed else 'warning')
+        return redirect(url_for('bulk_email'))
+
+    # GET — show school selector
+    tier = request.args.get('tier', '')
+    stage = request.args.get('stage', '')
+    schools_q = School.query.order_by(School.name)
+    if tier:
+        schools_q = schools_q.filter(School.priority_tier == tier)
+    if stage:
+        schools_q = schools_q.filter(School.stage == stage)
+    schools_list = schools_q.all()
+    stages = ['New', 'Contacted', 'Interested', 'Demo Booked', 'Won', 'Lost']
+    return render_template('email/bulk.html', schools=schools_list, templates=templates,
+                           tier=tier, stage=stage, stages=stages)
+
+
+# ── Reports ───────────────────────────────────────────────────────────────────
+
+@app.route('/reports')
+@login_required
+def reports():
+    today = date.today()
+
+    # Calls today per user
+    calls_today = db.session.query(
+        User.name, func.count(Activity.id)
+    ).join(Activity, Activity.user_id == User.id) \
+     .filter(Activity.type == 'call', func.date(Activity.created_at) == today) \
+     .group_by(User.name).all()
+
+    # Activity last 7 days
+    from datetime import timedelta
+    days = []
+    for i in range(6, -1, -1):
+        d = today - timedelta(days=i)
+        count = Activity.query.filter(
+            Activity.type == 'call',
+            func.date(Activity.created_at) == d
+        ).count()
+        days.append({'date': d.strftime('%a %d %b'), 'count': count})
+
+    # Outcome breakdown
+    outcomes = db.session.query(
+        Activity.outcome, func.count(Activity.id)
+    ).filter(Activity.type == 'call', Activity.outcome != '') \
+     .group_by(Activity.outcome).order_by(func.count(Activity.id).desc()).all()
+
+    # Pipeline stage counts
+    stages = ['New', 'Contacted', 'Interested', 'Demo Booked', 'Won', 'Lost']
+    stage_counts = {}
+    for s in stages:
+        stage_counts[s] = School.query.filter(School.stage == s).count()
+
+    # Email stats
+    email_stats = db.session.query(
+        EmailLog.status, func.count(EmailLog.id)
+    ).group_by(EmailLog.status).all()
+
+    # Per-user activity this week
+    week_start = today - timedelta(days=today.weekday())
+    user_activity = db.session.query(
+        User.name,
+        func.count(Activity.id).label('total'),
+        func.sum(func.cast(Activity.type == 'call', db.Integer)).label('calls'),
+        func.sum(func.cast(Activity.type == 'email', db.Integer)).label('emails'),
+    ).join(Activity, Activity.user_id == User.id) \
+     .filter(func.date(Activity.created_at) >= week_start) \
+     .group_by(User.name).all()
+
+    # Tier breakdown
+    tier_counts = db.session.query(
+        School.priority_tier, func.count(School.id)
+    ).group_by(School.priority_tier).all()
+
+    return render_template('reports.html',
+        calls_today=calls_today, days=days, outcomes=outcomes,
+        stage_counts=stage_counts, email_stats=email_stats,
+        user_activity=user_activity, tier_counts=tier_counts, today=today)
+
+
 @app.route('/email/templates', methods=['GET', 'POST'])
 @login_required
 def email_templates():
@@ -629,6 +815,8 @@ def migrate_db():
     migrations = [
         ('schools', 'business_manager_name',  'VARCHAR(200)'),
         ('schools', 'business_manager_email', 'VARCHAR(150)'),
+        ('schools', 'stage',                  'VARCHAR(50) DEFAULT \'New\''),
+        ('schools', 'school_notes',           'TEXT'),
     ]
     with db.engine.connect() as conn:
         for table, column, col_type in migrations:
