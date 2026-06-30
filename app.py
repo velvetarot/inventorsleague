@@ -505,6 +505,17 @@ def attachment_delete(attachment_id):
 
 # ── Email ─────────────────────────────────────────────────────────────────────
 
+def add_working_days(start_date, days):
+    """Return a date that is `days` working days after start_date, skipping weekends."""
+    current = start_date
+    added = 0
+    while added < days:
+        current += timedelta(days=1)
+        if current.weekday() < 5:  # Mon–Fri
+            added += 1
+    return current
+
+
 @app.route('/email/send', methods=['POST'])
 @login_required
 def email_send():
@@ -535,12 +546,31 @@ def email_send():
         status='sent' if message_id else 'error',
     )
     db.session.add(log)
+
+    # Auto-create a follow-up activity 3 working days from today for school emails
+    if message_id and school_id:
+        followup_date = add_working_days(date.today(), 3)
+        followup = Activity(
+            school_id=school_id,
+            user_id=current_user.id,
+            type='call',
+            outcome='',
+            notes=f'Auto follow-up for email sent: {subject}',
+            next_action=f'Follow up on email sent to {to_name or to_email}',
+            follow_up_date=followup_date,
+        )
+        db.session.add(followup)
+
     db.session.commit()
 
     if error:
         flash(f'Failed to send: {error}', 'danger')
     else:
-        flash(f'Email sent to {to_email}.', 'success')
+        if school_id:
+            followup_date = add_working_days(date.today(), 3)
+            flash(f'Email sent to {to_email}. Follow-up call scheduled for {followup_date.strftime("%A %d %b")}.', 'success')
+        else:
+            flash(f'Email sent to {to_email}.', 'success')
 
     if school_id:
         return redirect(url_for('school_detail', school_id=school_id))

@@ -109,7 +109,11 @@ class School(db.Model):
 
     @property
     def last_activity(self):
-        return self.activities.first()
+        last_act = self.activities.first()
+        last_email = EmailLog.query.filter_by(school_id=self.id).order_by(EmailLog.sent_at.desc()).first()
+        if last_act and last_email:
+            return last_act if last_act.created_at >= last_email.sent_at else last_email
+        return last_act or last_email
 
     @property
     def next_followup(self):
@@ -204,6 +208,27 @@ class EmailLog(db.Model):
     school = db.relationship('School', backref='emails')
     parent = db.relationship('Parent', backref='emails')
     user = db.relationship('User', backref='emails')
+
+    # Compatibility props so EmailLog can be used wherever Activity is expected
+    @property
+    def type(self):
+        return 'email'
+
+    @property
+    def outcome(self):
+        return self.status.title() if self.status else 'Sent'
+
+    @property
+    def notes(self):
+        return f'Email: {self.subject}'
+
+    @property
+    def created_at(self):
+        return self.sent_at
+
+    @property
+    def error_message(self):
+        return None
 
 
 class Activity(db.Model):
