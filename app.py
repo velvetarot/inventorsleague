@@ -53,6 +53,15 @@ def admin_required(f):
         return f(*args, **kwargs)
     return decorated
 
+def manager_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not current_user.is_authenticated or not current_user.is_manager:
+            flash('Manager access required.', 'danger')
+            return redirect(url_for('dashboard'))
+        return f(*args, **kwargs)
+    return decorated
+
 def delete_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
@@ -656,6 +665,7 @@ def school_quick_note(school_id):
 
 @app.route('/email/bulk', methods=['GET', 'POST'])
 @login_required
+@manager_required
 def bulk_email():
     templates = EmailTemplate.query.order_by(EmailTemplate.name).all()
     if request.method == 'POST':
@@ -782,6 +792,7 @@ def reports():
 
 @app.route('/email/templates', methods=['GET', 'POST'])
 @login_required
+@manager_required
 def email_templates():
     if request.method == 'POST':
         action = request.form.get('action')
