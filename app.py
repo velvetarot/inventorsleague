@@ -515,13 +515,12 @@ def api_reminders():
 @login_required
 def pipeline():
     stages = ['New', 'Contacted', 'Interested', 'Demo Booked', 'Won', 'Lost']
-    board = {}
-    for s in stages:
-        board[s] = School.query.filter(
-            (School.stage == s) | (School.stage == None if s == 'New' else False)
-        ).order_by(School.name).all()
-    # Schools with no stage go into New
-    board['New'] += School.query.filter(School.stage == None).all()
+    board = {s: [] for s in stages}
+    for school in School.query.order_by(School.name).all():
+        s = school.stage or 'New'
+        if s not in board:
+            s = 'New'
+        board[s].append(school)
     return render_template('pipeline.html', board=board, stages=stages)
 
 
@@ -658,8 +657,8 @@ def reports():
     user_activity = db.session.query(
         User.name,
         func.count(Activity.id).label('total'),
-        func.sum(func.cast(Activity.type == 'call', db.Integer)).label('calls'),
-        func.sum(func.cast(Activity.type == 'email', db.Integer)).label('emails'),
+        func.sum(db.case((Activity.type == 'call', 1), else_=0)).label('calls'),
+        func.sum(db.case((Activity.type == 'email', 1), else_=0)).label('emails'),
     ).join(Activity, Activity.user_id == User.id) \
      .filter(func.date(Activity.created_at) >= week_start) \
      .group_by(User.name).all()
