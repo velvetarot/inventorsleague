@@ -47,7 +47,7 @@ def login():
     if request.method == 'POST':
         user = User.query.filter_by(email=request.form['email'].strip().lower()).first()
         if user and user.check_password(request.form['password']):
-            login_user(user)
+            login_user(user, remember='remember' in request.form)
             return redirect(request.args.get('next') or url_for('dashboard'))
         flash('Invalid email or password.', 'danger')
     return render_template('auth/login.html')
