@@ -9,7 +9,7 @@
       {{ school.name }}
       {% if school.won %}<span class="badge bg-success ms-2">Won</span>{% endif %}
       {% if school.priority_tier %}
-      {% set tier_labels = {'A': 'Call Now', 'B': 'Call This Week', 'C': 'Keep Warm', 'D': 'Low Priority'} %}
+      {% set tier_labels = {'A': 'Call Now', 'B': 'Call This Week', 'C': 'Keep Warm', 'D': 'Low Priority', 'Z': 'Not Interested'} %}
       <span class="badge badge-tier-{{ school.priority_tier }} ms-1">{{ school.priority_tier }} — {{ tier_labels.get(school.priority_tier, school.priority_tier) }}</span>
       {% endif %}
     </h4>

@@ -166,7 +166,7 @@
   <div class="col-lg-4">
     <div class="card p-3">
       <div class="fw-bold mb-3"><i class="bi bi-funnel me-1"></i> Schools by Tier</div>
-      {% set tier_labels = {'A':'Call Now','B':'Call This Week','C':'Keep Warm','D':'Low Priority'} %}
+      {% set tier_labels = {'A':'Call Now','B':'Call This Week','C':'Keep Warm','D':'Low Priority','Z':'Not Interested'} %}
       <ul class="list-group list-group-flush">
         {% for tier, count in tier_counts | sort %}
         {% if tier %}

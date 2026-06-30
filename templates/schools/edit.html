@@ -65,6 +65,17 @@
       <div class="card p-4 mb-4">
         <h6 class="fw-bold mb-3 text-muted text-uppercase" style="font-size:.75rem;">Pipeline</h6>
         <div class="mb-3">
+          <label class="form-label fw-semibold">Priority Tier</label>
+          <select name="priority_tier" class="form-select">
+            <option value="">— No tier —</option>
+            <option value="A" {% if school and school.priority_tier == 'A' %}selected{% endif %}>A — Call Now</option>
+            <option value="B" {% if school and school.priority_tier == 'B' %}selected{% endif %}>B — Call This Week</option>
+            <option value="C" {% if school and school.priority_tier == 'C' %}selected{% endif %}>C — Keep Warm</option>
+            <option value="D" {% if school and school.priority_tier == 'D' %}selected{% endif %}>D — Low Priority</option>
+            <option value="Z" {% if school and school.priority_tier == 'Z' %}selected{% endif %}>Z — Not Interested (this time)</option>
+          </select>
+        </div>
+        <div class="mb-3">
           <label class="form-label">Decision Maker</label>
           <input type="text" name="decision_maker" class="form-control" value="{{ school.decision_maker if school else '' }}">
         </div>

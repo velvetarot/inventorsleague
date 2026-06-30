@@ -244,6 +244,7 @@ def school_edit(school_id):
         school.gatekeeper             = request.form.get('gatekeeper', '')
         school.business_manager_name  = request.form.get('business_manager_name', '')
         school.business_manager_email = request.form.get('business_manager_email', '')
+        school.priority_tier = request.form.get('priority_tier') or None
         school.after_school_club_status = request.form.get('after_school_club_status', '')
         school.assembly_opportunity = request.form.get('assembly_opportunity', '')
         school.summer_camp_status = request.form.get('summer_camp_status', '')

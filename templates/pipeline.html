@@ -32,7 +32,7 @@
         </div>
         {% if school.priority_tier %}
         <span class="badge badge-tier-{{ school.priority_tier }} mt-1" style="width:fit-content;font-size:.7rem;">
-          {{ {'A':'Call Now','B':'Call This Week','C':'Keep Warm','D':'Low Priority'}.get(school.priority_tier, school.priority_tier) }}
+          {{ {'A':'Call Now','B':'Call This Week','C':'Keep Warm','D':'Low Priority','Z':'Not Interested'}.get(school.priority_tier, school.priority_tier) }}
         </span>
         {% endif %}
         {% if school.last_activity %}

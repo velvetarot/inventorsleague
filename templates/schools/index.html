@@ -20,7 +20,7 @@
       </select>
     </div>
     <div class="col-auto">
-      {% set tier_labels = {'A': 'A — Call Now', 'B': 'B — Call This Week', 'C': 'C — Keep Warm', 'D': 'D — Low Priority'} %}
+      {% set tier_labels = {'A': 'A — Call Now', 'B': 'B — Call This Week', 'C': 'C — Keep Warm', 'D': 'D — Low Priority', 'Z': 'Z — Not Interested'} %}
       <select name="tier" class="form-select form-select-sm">
         <option value="">All tiers</option>
         {% for t in tiers %}<option value="{{ t }}" {% if t==tier %}selected{% endif %}>{{ tier_labels.get(t, t) }}</option>{% endfor %}
@@ -73,7 +73,7 @@
         <td><span class="text-muted small">{{ s.phase or '—' }}</span></td>
         <td>
           {% if s.priority_tier %}
-          {% set tier_labels = {'A': 'Call Now', 'B': 'Call This Week', 'C': 'Keep Warm', 'D': 'Low Priority'} %}
+          {% set tier_labels = {'A': 'Call Now', 'B': 'Call This Week', 'C': 'Keep Warm', 'D': 'Low Priority', 'Z': 'Not Interested'} %}
           <span class="badge badge-tier-{{ s.priority_tier }}">{{ s.priority_tier }} — {{ tier_labels.get(s.priority_tier, s.priority_tier) }}</span>
           {% else %}—{% endif %}
         </td>
