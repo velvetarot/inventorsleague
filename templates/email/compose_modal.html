@@ -221,8 +221,8 @@ function loadTemplate() {
       if (currentRecipient && currentRecipient.salutation) {
         const fn = firstName(currentRecipient.name);
         const salutation = currentRecipient.salutation.replace('{{first_name}}', fn);
-        body = body.replace(/^Dear\s+\{\{first_name\}\}/m, salutation)
-                   .replace(/^Dear\s+\{\{headteacher\}\}/m, salutation);
+        // Replace any Dear ... opening line regardless of what placeholder was used
+        body = body.replace(/^Dear\s+[^\n,]+/m, salutation);
       }
       document.getElementById('compose_body').value = applyMergeFields(body);
       document.getElementById('compose_template_name').value = t.name;
