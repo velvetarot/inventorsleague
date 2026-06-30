@@ -888,9 +888,11 @@ def reports():
      .group_by(User.name).all()
 
     # Tier breakdown
-    tier_counts = db.session.query(
-        School.priority_tier, func.count(School.id)
-    ).group_by(School.priority_tier).all()
+    tier_counts = sorted([
+        (tier, count) for tier, count in
+        db.session.query(School.priority_tier, func.count(School.id)).group_by(School.priority_tier).all()
+        if tier is not None
+    ], key=lambda x: x[0])
 
     return render_template('reports.html',
         calls_today=calls_today, days=days, outcomes=outcomes,
