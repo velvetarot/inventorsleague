@@ -1,0 +1,98 @@
+{% extends 'base.html' %}
+{% block title %}Schools{% endblock %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="fw-bold mb-0">Schools <span class="text-muted fs-6 fw-normal">({{ schools|length }})</span></h4>
+  <a href="{{ url_for('school_new') }}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg me-1"></i>Add School</a>
+</div>
+
+<!-- Filters -->
+<form method="get" class="card p-3 mb-3">
+  <div class="row g-2 align-items-end">
+    <div class="col-md-4">
+      <input type="text" name="q" value="{{ q }}" class="form-control form-control-sm" placeholder="Search name, city, headteacher…">
+    </div>
+    <div class="col-auto">
+      <select name="phase" class="form-select form-select-sm">
+        <option value="">All phases</option>
+        {% for p in phases %}<option {% if p==phase %}selected{% endif %}>{{ p }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="col-auto">
+      <select name="tier" class="form-select form-select-sm">
+        <option value="">All tiers</option>
+        {% for t in tiers %}<option {% if t==tier %}selected{% endif %}>{{ t }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="col-auto">
+      <select name="club_status" class="form-select form-select-sm">
+        <option value="">All club statuses</option>
+        {% for s in club_statuses %}<option {% if s==club_status %}selected{% endif %}>{{ s }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="col-auto">
+      <select name="sort" class="form-select form-select-sm">
+        <option value="name" {% if sort=='name' %}selected{% endif %}>Sort: Name</option>
+        <option value="priority" {% if sort=='priority' %}selected{% endif %}>Sort: Priority</option>
+        <option value="revenue" {% if sort=='revenue' %}selected{% endif %}>Sort: Revenue</option>
+        <option value="pupils" {% if sort=='pupils' %}selected{% endif %}>Sort: Pupils</option>
+      </select>
+    </div>
+    <div class="col-auto">
+      <button type="submit" class="btn btn-sm btn-outline-secondary">Filter</button>
+      <a href="{{ url_for('schools') }}" class="btn btn-sm btn-link">Clear</a>
+    </div>
+  </div>
+</form>
+
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-hover mb-0 align-middle">
+      <thead>
+        <tr>
+          <th>School</th>
+          <th>Phase</th>
+          <th>Tier</th>
+          <th>Pupils</th>
+          <th>Term Rev</th>
+          <th>Club Status</th>
+          <th>Last Activity</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for s in schools %}
+      <tr>
+        <td>
+          <a href="{{ url_for('school_detail', school_id=s.id) }}" class="fw-semibold text-decoration-none">{{ s.name }}</a>
+          {% if s.won %}<span class="badge bg-success ms-1">Won</span>{% endif %}
+          <div class="text-muted small">{{ s.city or '' }}{% if s.postcode %} {{ s.postcode }}{% endif %}</div>
+        </td>
+        <td><span class="text-muted small">{{ s.phase or '—' }}</span></td>
+        <td>
+          {% if s.priority_tier %}
+          <span class="badge badge-tier-{{ s.priority_tier }}">{{ s.priority_tier }}</span>
+          {% else %}—{% endif %}
+        </td>
+        <td class="text-muted small">{{ s.pupils or '—' }}</td>
+        <td class="text-muted small">{% if s.term_revenue %}£{{ '{:,.0f}'.format(s.term_revenue) }}{% else %}—{% endif %}</td>
+        <td><span class="text-muted small">{{ s.after_school_club_status or '—' }}</span></td>
+        <td class="text-muted small">
+          {% set la = s.last_activity %}
+          {% if la %}{{ la.created_at.strftime('%d %b') }}{% else %}Never{% endif %}
+        </td>
+        <td>
+          <a href="{{ url_for('activity_new', school_id=s.id) }}" class="btn btn-sm btn-outline-primary">
+            <i class="bi bi-telephone me-1"></i>Log
+          </a>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="8" class="text-center text-muted py-4">No schools found.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,131 @@
+{% extends 'base.html' %}
+{% block title %}Log Activity — {{ school.name }}{% endblock %}
+{% block content %}
+
+<div class="mb-3">
+  <a href="{{ url_for('school_detail', school_id=school.id) }}" class="text-muted small text-decoration-none">
+    <i class="bi bi-arrow-left me-1"></i>{{ school.name }}
+  </a>
+</div>
+<h4 class="fw-bold mb-4">Log Activity</h4>
+
+<div class="row">
+  <div class="col-md-7">
+    <div class="card p-4">
+
+      <!-- School quick summary -->
+      <div class="alert alert-light border mb-4">
+        <div class="fw-semibold">{{ school.name }}</div>
+        <div class="text-muted small">
+          {% if school.phone %}<a href="tel:{{ school.phone }}" class="text-decoration-none me-3"><i class="bi bi-telephone me-1"></i>{{ school.phone }}</a>{% endif %}
+          {% if school.main_email %}<a href="mailto:{{ school.main_email }}" class="text-decoration-none"><i class="bi bi-envelope me-1"></i>{{ school.main_email }}</a>{% endif %}
+        </div>
+        {% if school.headteacher %}<div class="text-muted small mt-1"><i class="bi bi-person me-1"></i>{{ school.headteacher }}</div>{% endif %}
+      </div>
+
+      <form method="post">
+
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Type</label>
+          <div class="d-flex gap-2 flex-wrap">
+            {% for t, icon in [('call','bi-telephone'), ('email','bi-envelope'), ('meeting','bi-people'), ('note','bi-sticky')] %}
+            <input type="radio" class="btn-check" name="type" id="type_{{ t }}" value="{{ t }}" {% if t=='call' %}checked{% endif %}>
+            <label class="btn btn-outline-secondary" for="type_{{ t }}"><i class="bi {{ icon }} me-1"></i>{{ t|capitalize }}</label>
+            {% endfor %}
+          </div>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Outcome</label>
+          <select name="outcome" class="form-select">
+            <option value="">— select —</option>
+            <option>Interested</option>
+            <option>Not Interested</option>
+            <option>Callback Requested</option>
+            <option>Left Voicemail</option>
+            <option>No Answer</option>
+            <option>Sent Info</option>
+            <option>Meeting Booked</option>
+            <option>Won</option>
+          </select>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Notes</label>
+          <textarea name="notes" class="form-control" rows="4" placeholder="What was discussed?"></textarea>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Next Action</label>
+          <input type="text" name="next_action" class="form-control" placeholder="e.g. Send proposal, Call back Thursday…">
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Follow-up Date</label>
+          <input type="date" name="follow_up_date" class="form-control" style="max-width:200px;">
+        </div>
+
+        <hr class="my-3">
+        <h6 class="fw-bold text-muted text-uppercase mb-3" style="font-size:.75rem;">Update Pipeline (optional)</h6>
+
+        <div class="row g-3 mb-3">
+          <div class="col-md-6">
+            <label class="form-label">After-School Club Status</label>
+            <select name="club_status" class="form-select form-select-sm">
+              <option value="">No change</option>
+              {% for s in ['Not Discussed', 'Interested', 'Proposal Sent', 'Negotiating', 'Won', 'Lost', 'Not Interested'] %}
+              <option {% if school.after_school_club_status == s %}selected{% endif %}>{{ s }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Assembly Opportunity</label>
+            <select name="assembly_opportunity" class="form-select form-select-sm">
+              <option value="">No change</option>
+              {% for s in ['Not Discussed', 'Interested', 'Booked', 'Done', 'Not Interested'] %}
+              <option {% if school.assembly_opportunity == s %}selected{% endif %}>{{ s }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+
+        <div class="form-check mb-4">
+          <input class="form-check-input" type="checkbox" name="won" id="won">
+          <label class="form-check-label" for="won">Mark school as <strong>Won</strong></label>
+        </div>
+
+        <div class="d-flex gap-2">
+          <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>Save Activity</button>
+          <a href="{{ url_for('school_detail', school_id=school.id) }}" class="btn btn-outline-secondary">Cancel</a>
+        </div>
+
+      </form>
+    </div>
+  </div>
+
+  <!-- Right: recent history -->
+  <div class="col-md-5">
+    <div class="card">
+      <div class="card-header fw-bold py-2 small">Recent History</div>
+      {% set recent = school.activities.limit(5).all() %}
+      {% if recent %}
+      <ul class="list-group list-group-flush">
+        {% for act in recent %}
+        <li class="list-group-item small">
+          <div class="d-flex justify-content-between">
+            <span class="fw-semibold text-capitalize">{{ act.type }}</span>
+            <span class="text-muted">{{ act.created_at.strftime('%d %b') }}</span>
+          </div>
+          {% if act.outcome %}<div class="text-muted">{{ act.outcome }}</div>{% endif %}
+          {% if act.notes %}<div>{{ act.notes[:80] }}</div>{% endif %}
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <div class="card-body text-muted small">No previous activity.</div>
+      {% endif %}
+    </div>
+  </div>
+
+</div>
+{% endblock %}

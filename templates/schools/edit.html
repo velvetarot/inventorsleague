@@ -1,0 +1,131 @@
+{% extends 'base.html' %}
+{% block title %}{% if school %}Edit {{ school.name }}{% else %}Add School{% endif %}{% endblock %}
+{% block content %}
+
+<div class="mb-3">
+  <a href="{% if school %}{{ url_for('school_detail', school_id=school.id) }}{% else %}{{ url_for('schools') }}{% endif %}" class="text-muted small text-decoration-none">
+    <i class="bi bi-arrow-left me-1"></i>Back
+  </a>
+</div>
+<h4 class="fw-bold mb-4">{% if school %}Edit {{ school.name }}{% else %}Add New School{% endif %}</h4>
+
+<form method="post">
+  <div class="row g-4">
+
+    <div class="col-md-6">
+      <div class="card p-4">
+        <h6 class="fw-bold mb-3 text-muted text-uppercase" style="font-size:.75rem;">Basic Info</h6>
+        <div class="mb-3">
+          <label class="form-label">School Name <span class="text-danger">*</span></label>
+          <input type="text" name="name" class="form-control" required value="{{ school.name if school else '' }}">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Phase</label>
+          <select name="phase" class="form-select">
+            <option value="">—</option>
+            {% for p in ['Primary', 'Secondary', 'All-through', 'Special'] %}
+            <option {% if school and school.phase == p %}selected{% endif %}>{{ p }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Account Type</label>
+          <input type="text" name="account_type" class="form-control" value="{{ school.account_type if school else '' }}">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Headteacher</label>
+          <input type="text" name="headteacher" class="form-control" value="{{ school.headteacher if school else '' }}">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Phone</label>
+          <input type="text" name="phone" class="form-control" value="{{ school.phone if school else '' }}">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Email</label>
+          <input type="email" name="main_email" class="form-control" value="{{ school.main_email if school else '' }}">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Website</label>
+          <input type="url" name="website" class="form-control" value="{{ school.website if school else '' }}">
+        </div>
+        <div class="row g-2">
+          <div class="col-8">
+            <label class="form-label">City / Town</label>
+            <input type="text" name="city" class="form-control" value="{{ school.city if school else '' }}">
+          </div>
+          <div class="col-4">
+            <label class="form-label">Postcode</label>
+            <input type="text" name="postcode" class="form-control" value="{{ school.postcode if school else '' }}">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-6">
+      <div class="card p-4 mb-4">
+        <h6 class="fw-bold mb-3 text-muted text-uppercase" style="font-size:.75rem;">Pipeline</h6>
+        <div class="mb-3">
+          <label class="form-label">Decision Maker</label>
+          <input type="text" name="decision_maker" class="form-control" value="{{ school.decision_maker if school else '' }}">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Gatekeeper</label>
+          <input type="text" name="gatekeeper" class="form-control" value="{{ school.gatekeeper if school else '' }}">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">After-School Club Status</label>
+          <select name="after_school_club_status" class="form-select">
+            <option value="">—</option>
+            {% for s in ['Not Discussed', 'Interested', 'Proposal Sent', 'Negotiating', 'Won', 'Lost', 'Not Interested'] %}
+            <option {% if school and school.after_school_club_status == s %}selected{% endif %}>{{ s }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Assembly Opportunity</label>
+          <select name="assembly_opportunity" class="form-select">
+            <option value="">—</option>
+            {% for s in ['Not Discussed', 'Interested', 'Booked', 'Done', 'Not Interested'] %}
+            <option {% if school and school.assembly_opportunity == s %}selected{% endif %}>{{ s }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Summer Camp Status</label>
+          <select name="summer_camp_status" class="form-select">
+            <option value="">—</option>
+            {% for s in ['Not Sent', 'Sent', 'Interested', 'Booked', 'Not Interested'] %}
+            <option {% if school and school.summer_camp_status == s %}selected{% endif %}>{{ s }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="d-flex gap-4">
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="digital_flyer_sent" id="df" {% if school and school.digital_flyer_sent %}checked{% endif %}>
+            <label class="form-check-label" for="df">Digital flyer sent</label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="physical_flyer_sent" id="pf" {% if school and school.physical_flyer_sent %}checked{% endif %}>
+            <label class="form-check-label" for="pf">Physical flyer sent</label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="won" id="won" {% if school and school.won %}checked{% endif %}>
+            <label class="form-check-label" for="won">Won</label>
+          </div>
+        </div>
+      </div>
+
+      <div class="card p-4">
+        <h6 class="fw-bold mb-3 text-muted text-uppercase" style="font-size:.75rem;">Notes</h6>
+        <textarea name="description" class="form-control" rows="5">{{ school.description if school else '' }}</textarea>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="mt-4 d-flex gap-2">
+    <button type="submit" class="btn btn-primary">Save</button>
+    <a href="{% if school %}{{ url_for('school_detail', school_id=school.id) }}{% else %}{{ url_for('schools') }}{% endif %}" class="btn btn-outline-secondary">Cancel</a>
+  </div>
+</form>
+{% endblock %}

@@ -1,0 +1,141 @@
+{% extends 'base.html' %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+
+<h4 class="fw-bold mb-4">Dashboard</h4>
+
+<!-- Stats row -->
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3">
+    <div class="card stat-card p-3" style="border-color:#0d6efd">
+      <div class="text-muted small">Total Schools</div>
+      <div class="fs-3 fw-bold">{{ stats.total_schools }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card stat-card p-3" style="border-color:#198754">
+      <div class="text-muted small">Contacted</div>
+      <div class="fs-3 fw-bold">{{ stats.called }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card stat-card p-3" style="border-color:#ffc107">
+      <div class="text-muted small">Won</div>
+      <div class="fs-3 fw-bold">{{ stats.won }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card stat-card p-3" style="border-color:#dc3545">
+      <div class="text-muted small">Overdue Follow-ups</div>
+      <div class="fs-3 fw-bold {% if stats.overdue %}text-danger{% endif %}">{{ stats.overdue }}</div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4">
+  <!-- Left: Follow-ups -->
+  <div class="col-lg-7">
+
+    {% if overdue %}
+    <div class="card mb-3">
+      <div class="card-header bg-danger text-white fw-bold py-2">
+        <i class="bi bi-exclamation-triangle me-1"></i> Overdue ({{ overdue|length }})
+      </div>
+      <ul class="list-group list-group-flush">
+        {% for act in overdue %}
+        <li class="list-group-item d-flex justify-content-between align-items-center overdue">
+          <div>
+            <a href="{{ url_for('school_detail', school_id=act.school_id) }}" class="fw-semibold text-decoration-none">{{ act.school.name }}</a>
+            <div class="text-muted small">{{ act.next_action or act.notes[:60] }}</div>
+          </div>
+          <div class="text-end">
+            <span class="badge bg-danger">{{ act.follow_up_date.strftime('%d %b') }}</span>
+            <button class="btn btn-sm btn-outline-secondary ms-1 mark-done" data-id="{{ act.id }}">Done</button>
+          </div>
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+
+    <div class="card mb-3">
+      <div class="card-header fw-bold py-2">
+        <i class="bi bi-calendar-check me-1"></i> Due Today ({{ due_today|length }})
+      </div>
+      {% if due_today %}
+      <ul class="list-group list-group-flush">
+        {% for act in due_today %}
+        <li class="list-group-item d-flex justify-content-between align-items-center">
+          <div>
+            <a href="{{ url_for('school_detail', school_id=act.school_id) }}" class="fw-semibold text-decoration-none">{{ act.school.name }}</a>
+            <div class="text-muted small">{{ act.next_action or act.notes[:60] }}</div>
+          </div>
+          <button class="btn btn-sm btn-outline-success mark-done" data-id="{{ act.id }}">Done</button>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <div class="card-body text-muted">Nothing due today.</div>
+      {% endif %}
+    </div>
+
+    {% if due_soon %}
+    <div class="card">
+      <div class="card-header fw-bold py-2"><i class="bi bi-clock me-1"></i> Coming Up</div>
+      <ul class="list-group list-group-flush">
+        {% for act in due_soon %}
+        <li class="list-group-item d-flex justify-content-between align-items-center">
+          <div>
+            <a href="{{ url_for('school_detail', school_id=act.school_id) }}" class="fw-semibold text-decoration-none">{{ act.school.name }}</a>
+            <div class="text-muted small">{{ act.next_action or '' }}</div>
+          </div>
+          <span class="text-muted small">{{ act.follow_up_date.strftime('%d %b') }}</span>
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+
+  </div>
+
+  <!-- Right: Recent activity -->
+  <div class="col-lg-5">
+    <div class="card">
+      <div class="card-header fw-bold py-2"><i class="bi bi-activity me-1"></i> Recent Activity</div>
+      <ul class="list-group list-group-flush">
+        {% for act in recent %}
+        {% set icon_map = {'call': 'bi-telephone', 'email': 'bi-envelope', 'meeting': 'bi-people', 'note': 'bi-sticky'} %}
+        {% set color_map = {'call': 'bg-primary', 'email': 'bg-info', 'meeting': 'bg-warning', 'note': 'bg-secondary'} %}
+        <li class="list-group-item">
+          <div class="d-flex align-items-start gap-2">
+            <div class="activity-icon text-white {{ color_map.get(act.type, 'bg-secondary') }} flex-shrink-0 mt-1">
+              <i class="bi {{ icon_map.get(act.type, 'bi-dot') }}"></i>
+            </div>
+            <div>
+              <a href="{{ url_for('school_detail', school_id=act.school_id) }}" class="fw-semibold text-decoration-none small">{{ act.school.name }}</a>
+              {% if act.outcome %}<span class="badge bg-light text-dark ms-1">{{ act.outcome }}</span>{% endif %}
+              {% if act.notes %}<div class="text-muted" style="font-size:.8rem;">{{ act.notes[:80] }}</div>{% endif %}
+              <div class="text-muted" style="font-size:.75rem;">{{ act.created_at.strftime('%d %b, %H:%M') }}{% if act.user %} · {{ act.user.name }}{% endif %}</div>
+            </div>
+          </div>
+        </li>
+        {% endfor %}
+        {% if not recent %}
+        <li class="list-group-item text-muted">No activity yet.</li>
+        {% endif %}
+      </ul>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script>
+document.querySelectorAll('.mark-done').forEach(btn => {
+  btn.addEventListener('click', function() {
+    fetch('/activity/' + this.dataset.id + '/complete', {method:'POST'})
+      .then(() => this.closest('li').remove());
+  });
+});
+</script>
+{% endblock %}
