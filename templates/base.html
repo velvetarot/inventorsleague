@@ -27,7 +27,9 @@
 <div class="d-flex">
   {% if current_user.is_authenticated %}
   <div class="sidebar d-flex flex-column p-0" style="width:220px; flex-shrink:0;">
-    <div class="brand"><i class="bi bi-mortarboard-fill me-2"></i>Schools CRM</div>
+    <div class="brand text-center pb-3">
+      <img src="{{ url_for('static', filename='Inventors League LOGO.png') }}" alt="Inventors League" style="width:160px;">
+    </div>
     <a href="{{ url_for('dashboard') }}" class="{% if request.endpoint == 'dashboard' %}active{% endif %}">
       <i class="bi bi-speedometer2 me-2"></i>Dashboard
     </a>
