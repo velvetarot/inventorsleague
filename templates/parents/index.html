@@ -1,0 +1,84 @@
+{% extends 'base.html' %}
+{% block title %}Parents{% endblock %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="fw-bold mb-0">Parents & Private Bookings <span class="text-muted fs-6 fw-normal">({{ parents|length }})</span></h4>
+  <a href="{{ url_for('parent_new') }}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg me-1"></i>Add Parent</a>
+</div>
+
+<form method="get" class="card p-3 mb-3">
+  <div class="row g-2 align-items-end">
+    <div class="col-md-4">
+      <input type="text" name="q" value="{{ q }}" class="form-control form-control-sm" placeholder="Search name, child, phone…">
+    </div>
+    <div class="col-auto">
+      <select name="enquiry" class="form-select form-select-sm">
+        <option value="">All enquiry types</option>
+        {% for e in enquiries %}<option {% if e==enquiry %}selected{% endif %}>{{ e }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="col-auto">
+      <select name="status" class="form-select form-select-sm">
+        <option value="">All statuses</option>
+        {% for s in statuses %}<option {% if s==status %}selected{% endif %}>{{ s }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="col-auto">
+      <button type="submit" class="btn btn-sm btn-outline-secondary">Filter</button>
+      <a href="{{ url_for('parents') }}" class="btn btn-sm btn-link">Clear</a>
+    </div>
+  </div>
+</form>
+
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-hover mb-0 align-middle">
+      <thead>
+        <tr>
+          <th>Parent</th>
+          <th>Child</th>
+          <th>Enquiry</th>
+          <th>Event Date</th>
+          <th>Status</th>
+          <th>Last Contact</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+      {% set status_colours = {'New Enquiry': 'warning', 'Quoted': 'info', 'Booked': 'primary', 'Done': 'success', 'Lost': 'secondary'} %}
+      {% for p in parents %}
+      <tr>
+        <td>
+          <a href="{{ url_for('parent_detail', parent_id=p.id) }}" class="fw-semibold text-decoration-none">{{ p.name }}</a>
+          <div class="text-muted small">
+            {% if p.phone %}<a href="tel:{{ p.phone }}" class="text-decoration-none text-muted me-2"><i class="bi bi-telephone me-1"></i>{{ p.phone }}</a>{% endif %}
+          </div>
+        </td>
+        <td class="text-muted small">
+          {{ p.child_name or '—' }}
+          {% if p.child_age %}<span class="text-muted">(age {{ p.child_age }})</span>{% endif %}
+        </td>
+        <td class="text-muted small">{{ p.enquiry_type or '—' }}</td>
+        <td class="text-muted small">{{ p.event_date.strftime('%d %b %Y') if p.event_date else '—' }}</td>
+        <td>
+          <span class="badge bg-{{ status_colours.get(p.status, 'secondary') }}">{{ p.status or '—' }}</span>
+        </td>
+        <td class="text-muted small">
+          {% set la = p.contact_log.first() %}
+          {% if la %}{{ la.created_at.strftime('%d %b') }}{% else %}Never{% endif %}
+        </td>
+        <td>
+          <a href="{{ url_for('parent_activity_new', parent_id=p.id) }}" class="btn btn-sm btn-outline-primary">
+            <i class="bi bi-telephone me-1"></i>Log
+          </a>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="7" class="text-center text-muted py-4">No parents found.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

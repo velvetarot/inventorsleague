@@ -1,0 +1,90 @@
+{% extends 'base.html' %}
+{% block title %}{% if parent %}Edit {{ parent.name }}{% else %}Add Parent{% endif %}{% endblock %}
+{% block content %}
+
+<div class="mb-3">
+  <a href="{% if parent %}{{ url_for('parent_detail', parent_id=parent.id) }}{% else %}{{ url_for('parents') }}{% endif %}" class="text-muted small text-decoration-none">
+    <i class="bi bi-arrow-left me-1"></i>Back
+  </a>
+</div>
+<h4 class="fw-bold mb-4">{% if parent %}Edit {{ parent.name }}{% else %}Add New Parent{% endif %}</h4>
+
+<form method="post">
+  <div class="row g-4">
+    <div class="col-md-6">
+      <div class="card p-4">
+        <h6 class="fw-bold mb-3 text-muted text-uppercase" style="font-size:.75rem;">Contact Details</h6>
+        <div class="mb-3">
+          <label class="form-label">Parent Name <span class="text-danger">*</span></label>
+          <input type="text" name="name" class="form-control" required value="{{ parent.name if parent else '' }}">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Phone</label>
+          <input type="text" name="phone" class="form-control" value="{{ parent.phone if parent else '' }}">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Email</label>
+          <input type="email" name="email" class="form-control" value="{{ parent.email if parent else '' }}">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">How did they find us?</label>
+          <select name="source" class="form-select">
+            <option value="">— select —</option>
+            {% for s in ['Word of mouth', 'Google', 'School', 'Social media', 'Flyer', 'Other'] %}
+            <option {% if parent and parent.source == s %}selected{% endif %}>{{ s }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-6">
+      <div class="card p-4">
+        <h6 class="fw-bold mb-3 text-muted text-uppercase" style="font-size:.75rem;">Enquiry Details</h6>
+        <div class="mb-3">
+          <label class="form-label">Enquiry Type</label>
+          <select name="enquiry_type" class="form-select">
+            <option value="">— select —</option>
+            {% for t in ['Birthday Party', 'Holiday Camp', 'Private Tuition', 'After-School Club', 'Other'] %}
+            <option {% if parent and parent.enquiry_type == t %}selected{% endif %}>{{ t }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Child's Name</label>
+          <input type="text" name="child_name" class="form-control" value="{{ parent.child_name if parent else '' }}">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Child's Age</label>
+          <input type="number" name="child_age" class="form-control" min="3" max="18" style="max-width:100px;" value="{{ parent.child_age if parent else '' }}">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Event / Session Date</label>
+          <input type="date" name="event_date" class="form-control" style="max-width:200px;"
+            value="{{ parent.event_date.strftime('%Y-%m-%d') if parent and parent.event_date else '' }}">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Status</label>
+          <select name="status" class="form-select">
+            {% for s in ['New Enquiry', 'Quoted', 'Booked', 'Done', 'Lost'] %}
+            <option {% if parent and parent.status == s %}selected{% elif not parent and s == 'New Enquiry' %}selected{% endif %}>{{ s }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12">
+      <div class="card p-4">
+        <h6 class="fw-bold mb-3 text-muted text-uppercase" style="font-size:.75rem;">Notes</h6>
+        <textarea name="notes" class="form-control" rows="4" placeholder="Party theme, number of children, special requirements…">{{ parent.notes if parent else '' }}</textarea>
+      </div>
+    </div>
+  </div>
+
+  <div class="mt-4 d-flex gap-2">
+    <button type="submit" class="btn btn-primary">Save</button>
+    <a href="{% if parent %}{{ url_for('parent_detail', parent_id=parent.id) }}{% else %}{{ url_for('parents') }}{% endif %}" class="btn btn-outline-secondary">Cancel</a>
+  </div>
+</form>
+{% endblock %}

@@ -1,0 +1,106 @@
+{% extends 'base.html' %}
+{% block title %}Log Activity — {{ parent.name }}{% endblock %}
+{% block content %}
+
+<div class="mb-3">
+  <a href="{{ url_for('parent_detail', parent_id=parent.id) }}" class="text-muted small text-decoration-none">
+    <i class="bi bi-arrow-left me-1"></i>{{ parent.name }}
+  </a>
+</div>
+<h4 class="fw-bold mb-4">Log Activity</h4>
+
+<div class="row">
+  <div class="col-md-7">
+    <div class="card p-4">
+
+      <div class="alert alert-light border mb-4">
+        <div class="fw-semibold">{{ parent.name }}</div>
+        <div class="text-muted small">
+          {% if parent.phone %}<a href="tel:{{ parent.phone }}" class="text-decoration-none me-3"><i class="bi bi-telephone me-1"></i>{{ parent.phone }}</a>{% endif %}
+          {% if parent.email %}<a href="mailto:{{ parent.email }}" class="text-decoration-none"><i class="bi bi-envelope me-1"></i>{{ parent.email }}</a>{% endif %}
+        </div>
+        {% if parent.enquiry_type %}<div class="text-muted small mt-1">{{ parent.enquiry_type }}{% if parent.child_name %} — {{ parent.child_name }}{% if parent.child_age %}, age {{ parent.child_age }}{% endif %}{% endif %}</div>{% endif %}
+      </div>
+
+      <form method="post">
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Type</label>
+          <div class="d-flex gap-2 flex-wrap">
+            {% for t, icon in [('call','bi-telephone'), ('email','bi-envelope'), ('meeting','bi-people'), ('note','bi-sticky')] %}
+            <input type="radio" class="btn-check" name="type" id="type_{{ t }}" value="{{ t }}" {% if t=='call' %}checked{% endif %}>
+            <label class="btn btn-outline-secondary" for="type_{{ t }}"><i class="bi {{ icon }} me-1"></i>{{ t|capitalize }}</label>
+            {% endfor %}
+          </div>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Outcome</label>
+          <select name="outcome" class="form-select">
+            <option value="">— select —</option>
+            <option>Interested</option>
+            <option>Not Interested</option>
+            <option>Callback Requested</option>
+            <option>Left Voicemail</option>
+            <option>No Answer</option>
+            <option>Quote Sent</option>
+            <option>Booked</option>
+          </select>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Notes</label>
+          <textarea name="notes" class="form-control" rows="4" placeholder="What was discussed?"></textarea>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Next Action</label>
+          <input type="text" name="next_action" class="form-control" placeholder="e.g. Send quote, Call back Friday…">
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Follow-up Date</label>
+          <input type="date" name="follow_up_date" class="form-control" style="max-width:200px;">
+        </div>
+
+        <div class="mb-4">
+          <label class="form-label fw-semibold">Update Status</label>
+          <select name="status" class="form-select" style="max-width:220px;">
+            <option value="">No change</option>
+            {% for s in ['New Enquiry', 'Quoted', 'Booked', 'Done', 'Lost'] %}
+            <option {% if parent.status == s %}selected{% endif %}>{{ s }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="d-flex gap-2">
+          <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>Save Activity</button>
+          <a href="{{ url_for('parent_detail', parent_id=parent.id) }}" class="btn btn-outline-secondary">Cancel</a>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="col-md-5">
+    <div class="card">
+      <div class="card-header fw-bold py-2 small">Recent History</div>
+      {% set recent = parent.contact_log.limit(5).all() %}
+      {% if recent %}
+      <ul class="list-group list-group-flush">
+        {% for act in recent %}
+        <li class="list-group-item small">
+          <div class="d-flex justify-content-between">
+            <span class="fw-semibold text-capitalize">{{ act.type }}</span>
+            <span class="text-muted">{{ act.created_at.strftime('%d %b') }}</span>
+          </div>
+          {% if act.outcome %}<div class="text-muted">{{ act.outcome }}</div>{% endif %}
+          {% if act.notes %}<div>{{ act.notes[:80] }}</div>{% endif %}
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <div class="card-body text-muted small">No previous contact.</div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

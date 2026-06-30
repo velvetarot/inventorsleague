@@ -72,6 +72,16 @@
           <label class="form-label">Gatekeeper</label>
           <input type="text" name="gatekeeper" class="form-control" value="{{ school.gatekeeper if school else '' }}">
         </div>
+        <div class="row g-2">
+          <div class="col-7">
+            <label class="form-label">Business Manager Name</label>
+            <input type="text" name="business_manager_name" class="form-control" value="{{ school.business_manager_name if school else '' }}">
+          </div>
+          <div class="col-12">
+            <label class="form-label">Business Manager Email</label>
+            <input type="email" name="business_manager_email" class="form-control" value="{{ school.business_manager_email if school else '' }}">
+          </div>
+        </div>
         <div class="mb-3">
           <label class="form-label">After-School Club Status</label>
           <select name="after_school_club_status" class="form-select">

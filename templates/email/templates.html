@@ -1,0 +1,107 @@
+{% extends 'base.html' %}
+{% block title %}Email Templates{% endblock %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h4 class="fw-bold mb-0">Email Templates</h4>
+  <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#templateModal" onclick="newTemplate()">
+    <i class="bi bi-plus-lg me-1"></i>New Template
+  </button>
+</div>
+
+{% if templates %}
+<div class="row g-3">
+  {% for t in templates %}
+  <div class="col-12">
+    <div class="card">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-start">
+          <div>
+            <h6 class="fw-bold mb-1">{{ t.name }}</h6>
+            <div class="text-muted small mb-2"><strong>Subject:</strong> {{ t.subject }}</div>
+            <div class="small text-muted border rounded p-2 bg-light" style="max-height:80px;overflow:hidden;">
+              {{ t.body_html | striptags | truncate(200) }}
+            </div>
+          </div>
+          <div class="d-flex gap-2 ms-3 flex-shrink-0">
+            <button class="btn btn-sm btn-outline-secondary"
+              onclick="editTemplate({{ t.id }}, {{ t.name|tojson }}, {{ t.subject|tojson }}, {{ t.body_html|tojson }})">
+              <i class="bi bi-pencil"></i>
+            </button>
+            <form method="post" onsubmit="return confirm('Delete this template?')">
+              <input type="hidden" name="action" value="delete">
+              <input type="hidden" name="template_id" value="{{ t.id }}">
+              <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="card p-5 text-center text-muted">
+  <i class="bi bi-envelope-paper fs-1 d-block mb-3"></i>
+  No templates yet. Create your first one to get started.
+</div>
+{% endif %}
+
+<!-- Template editor modal -->
+<div class="modal fade" id="templateModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <form method="post">
+        <input type="hidden" name="action" value="save">
+        <input type="hidden" name="template_id" id="template_id" value="">
+        <div class="modal-header">
+          <h5 class="modal-title" id="templateModalTitle">New Template</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Template Name</label>
+            <input type="text" name="name" id="tpl_name" class="form-control" placeholder="e.g. Initial Outreach" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Subject Line</label>
+            <input type="text" name="subject" id="tpl_subject" class="form-control"
+              placeholder="e.g. Exciting after-school clubs for {{school_name}}" required>
+            <div class="form-text">Use <code>{{school_name}}</code>, <code>{{headteacher}}</code>, <code>{{first_name}}</code> as placeholders.</div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Email Body</label>
+            <textarea name="body_html" id="tpl_body" class="form-control font-monospace" rows="14" required
+              placeholder="Dear {{headteacher}},&#10;&#10;I hope this email finds you well..."></textarea>
+            <div class="form-text">Plain text or HTML. Placeholders: <code>{{school_name}}</code> <code>{{headteacher}}</code> <code>{{first_name}}</code> <code>{{city}}</code></div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Template</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script>
+function newTemplate() {
+  document.getElementById('templateModalTitle').textContent = 'New Template';
+  document.getElementById('template_id').value = '';
+  document.getElementById('tpl_name').value = '';
+  document.getElementById('tpl_subject').value = '';
+  document.getElementById('tpl_body').value = '';
+}
+function editTemplate(id, name, subject, body) {
+  document.getElementById('templateModalTitle').textContent = 'Edit Template';
+  document.getElementById('template_id').value = id;
+  document.getElementById('tpl_name').value = name;
+  document.getElementById('tpl_subject').value = subject;
+  document.getElementById('tpl_body').value = body;
+  new bootstrap.Modal(document.getElementById('templateModal')).show();
+}
+</script>
+{% endblock %}

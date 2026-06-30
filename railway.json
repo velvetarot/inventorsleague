@@ -4,7 +4,7 @@
     "builder": "NIXPACKS"
   },
   "deploy": {
-    "startCommand": "python -c \"from app import create_tables; create_tables()\" && gunicorn app:app --bind 0.0.0.0:$PORT",
+    "startCommand": "python -c \"from app import create_tables; create_tables()\" && gunicorn app:app --bind 0.0.0.0:$PORT --workers 2 --timeout 120",
     "healthcheckPath": "/login",
     "restartPolicyType": "ON_FAILURE"
   }

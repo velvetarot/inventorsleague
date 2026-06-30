@@ -8,7 +8,10 @@
     <h4 class="fw-bold mb-0 mt-1">
       {{ school.name }}
       {% if school.won %}<span class="badge bg-success ms-2">Won</span>{% endif %}
-      {% if school.priority_tier %}<span class="badge badge-tier-{{ school.priority_tier }} ms-1">Tier {{ school.priority_tier }}</span>{% endif %}
+      {% if school.priority_tier %}
+      {% set tier_labels = {'A': 'Call Now', 'B': 'Call This Week', 'C': 'Keep Warm', 'D': 'Low Priority'} %}
+      <span class="badge badge-tier-{{ school.priority_tier }} ms-1">{{ school.priority_tier }} — {{ tier_labels.get(school.priority_tier, school.priority_tier) }}</span>
+      {% endif %}
     </h4>
     <div class="text-muted small">{{ school.phase or '' }}{% if school.account_type %} · {{ school.account_type }}{% endif %}{% if school.city %} · {{ school.city }}{% if school.postcode %} {{ school.postcode }}{% endif %}{% endif %}</div>
   </div>
@@ -20,7 +23,7 @@
 
 <div class="row g-4">
 
-  <!-- Left column: details -->
+  <!-- Left column -->
   <div class="col-lg-4">
 
     <div class="card mb-3">
@@ -33,7 +36,11 @@
         <div class="mb-2"><a href="tel:{{ school.phone }}" class="text-decoration-none"><i class="bi bi-telephone me-2 text-muted"></i>{{ school.phone }}</a></div>
         {% endif %}
         {% if school.main_email %}
-        <div class="mb-2"><a href="mailto:{{ school.main_email }}" class="text-decoration-none"><i class="bi bi-envelope me-2 text-muted"></i>{{ school.main_email }}</a></div>
+        <div class="mb-2">
+          <a href="#" onclick="openCompose('{{ school.main_email }}', '{{ (school.headteacher or school.name)|e }}')" class="text-decoration-none">
+            <i class="bi bi-envelope me-2 text-muted"></i>{{ school.main_email }}
+          </a>
+        </div>
         {% endif %}
         {% if school.website %}
         <div class="mb-2"><a href="{{ school.website }}" target="_blank" class="text-decoration-none text-truncate d-block"><i class="bi bi-globe me-2 text-muted"></i>{{ school.website }}</a></div>
@@ -98,16 +105,33 @@
 
   </div>
 
-  <!-- Right column: activity log -->
+  <!-- Right column: unified timeline -->
   <div class="col-lg-8">
     <div class="card">
       <div class="card-header fw-bold py-2 d-flex justify-content-between align-items-center">
-        <span><i class="bi bi-clock-history me-1"></i>Activity Log</span>
-        <a href="{{ url_for('activity_new', school_id=school.id) }}" class="btn btn-sm btn-primary">+ Log</a>
+        <span><i class="bi bi-clock-history me-1"></i>Activity &amp; Email Log</span>
+        <div class="d-flex gap-2">
+          {% if school.main_email %}
+          <button class="btn btn-sm btn-outline-success" onclick="openCompose('{{ school.main_email }}', '{{ (school.headteacher or school.name)|e }}')">
+            <i class="bi bi-envelope me-1"></i>Send Email
+          </button>
+          {% endif %}
+          <a href="{{ url_for('activity_new', school_id=school.id) }}" class="btn btn-sm btn-primary">+ Log Call</a>
+        </div>
       </div>
-      {% if activities %}
+
+      {# Build unified timeline from calls and emails #}
+      {% set timeline = [] %}
+      {% for a in activities %}{% set _ = timeline.append(('activity', a.created_at, a)) %}{% endfor %}
+      {% for e in email_logs %}{% set _ = timeline.append(('email', e.sent_at, e)) %}{% endfor %}
+      {% set timeline = timeline | sort(attribute='1', reverse=True) %}
+
+      {% if timeline %}
       <ul class="list-group list-group-flush">
-        {% for act in activities %}
+        {% for kind, ts, item in timeline %}
+
+        {% if kind == 'activity' %}
+        {% set act = item %}
         {% set icon_map = {'call': 'bi-telephone-fill', 'email': 'bi-envelope-fill', 'meeting': 'bi-people-fill', 'note': 'bi-sticky-fill'} %}
         {% set color_map = {'call': 'bg-primary', 'email': 'bg-info', 'meeting': 'bg-warning', 'note': 'bg-secondary'} %}
         <li class="list-group-item">
@@ -124,10 +148,9 @@
                 <small class="text-muted">{{ act.created_at.strftime('%d %b %Y, %H:%M') }}{% if act.user %} · {{ act.user.name }}{% endif %}</small>
               </div>
               {% if act.notes %}<p class="mb-1 mt-1 small">{{ act.notes }}</p>{% endif %}
-              {% if act.next_action %}
-              <div class="small text-primary"><i class="bi bi-arrow-right me-1"></i>{{ act.next_action }}</div>
-              {% endif %}
+              {% if act.next_action %}<div class="small text-primary"><i class="bi bi-arrow-right me-1"></i>{{ act.next_action }}</div>{% endif %}
               {% if act.follow_up_date %}
+              {% set today = today_date %}
               <div class="small {% if act.follow_up_complete %}text-muted text-decoration-line-through{% elif act.follow_up_date < today %}text-danger fw-semibold{% else %}text-success{% endif %}">
                 <i class="bi bi-calendar me-1"></i>Follow-up: {{ act.follow_up_date.strftime('%d %b %Y') }}
                 {% if act.follow_up_complete %} ✓{% endif %}
@@ -136,19 +159,72 @@
             </div>
           </div>
         </li>
+
+        {% else %}
+        {% set em = item %}
+        {% set status_icon = {'sent': 'bi-send', 'delivered': 'bi-inbox', 'opened': 'bi-eye-fill', 'bounced': 'bi-x-circle', 'error': 'bi-exclamation-circle'} %}
+        {% set status_colour = {'sent': 'text-muted', 'delivered': 'text-primary', 'opened': 'text-success fw-semibold', 'bounced': 'text-danger', 'error': 'text-danger'} %}
+        <li class="list-group-item">
+          <div class="d-flex gap-3">
+            <div class="activity-icon text-white bg-success flex-shrink-0 mt-1">
+              <i class="bi bi-envelope-fill"></i>
+            </div>
+            <div class="flex-grow-1">
+              <div class="d-flex justify-content-between">
+                <div>
+                  <span class="fw-semibold">Email</span>
+                  {% if em.template_name %}<span class="badge bg-light text-dark ms-2">{{ em.template_name }}</span>{% endif %}
+                  <span class="ms-2 small {{ status_colour.get(em.status, 'text-muted') }}">
+                    <i class="bi {{ status_icon.get(em.status, 'bi-send') }} me-1"></i>{{ em.status | capitalize }}
+                    {% if em.opened_at %} · Opened {{ em.opened_at.strftime('%d %b %H:%M') }}
+                    {% elif em.delivered_at %} · Delivered {{ em.delivered_at.strftime('%d %b %H:%M') }}
+                    {% endif %}
+                  </span>
+                </div>
+                <small class="text-muted">{{ em.sent_at.strftime('%d %b %Y, %H:%M') }}{% if em.user %} · {{ em.user.name }}{% endif %}</small>
+              </div>
+              <div class="small text-muted mt-1">
+                <strong>To:</strong> {{ em.to_email }} &nbsp;
+                <strong>Subject:</strong> {{ em.subject }}
+              </div>
+              <div class="mt-2 d-flex gap-2">
+                {% if em.status == 'error' %}
+                <button type="button" class="btn btn-sm btn-outline-warning"
+                  onclick="resendEmail({{ em.id }})">
+                  <i class="bi bi-arrow-clockwise me-1"></i>Review &amp; Resend
+                </button>
+                {% endif %}
+                <form method="post" action="{{ url_for('email_log_delete', log_id=em.id) }}"
+                      onsubmit="return confirm('Delete this email from the log?')">
+                  <button type="submit" class="btn btn-sm btn-outline-danger">
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </form>
+              </div>
+            </div>
+          </div>
+        </li>
+        {% endif %}
+
         {% endfor %}
       </ul>
       {% else %}
       <div class="card-body text-muted text-center py-5">
         <i class="bi bi-telephone-x fs-1 d-block mb-2"></i>
-        No activity logged yet.<br>
+        No activity yet.<br>
         <a href="{{ url_for('activity_new', school_id=school.id) }}">Log the first contact</a>
+        {% if school.main_email %}
+        or <a href="#" onclick="openCompose('{{ school.main_email }}', '{{ (school.headteacher or school.name)|e }}')">send an email</a>
+        {% endif %}
       </div>
       {% endif %}
+
     </div>
   </div>
 
 </div>
+
+{% include 'email/compose_modal.html' %}
 {% endblock %}
 {% block scripts %}
 <script>

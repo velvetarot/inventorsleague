@@ -1,0 +1,227 @@
+{% extends 'base.html' %}
+{% block title %}{{ parent.name }}{% endblock %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-start mb-3">
+  <div>
+    <a href="{{ url_for('parents') }}" class="text-muted small text-decoration-none"><i class="bi bi-arrow-left me-1"></i>Parents</a>
+    {% set status_colours = {'New Enquiry': 'warning', 'Quoted': 'info', 'Booked': 'primary', 'Done': 'success', 'Lost': 'secondary'} %}
+    <h4 class="fw-bold mb-0 mt-1">
+      {{ parent.name }}
+      <span class="badge bg-{{ status_colours.get(parent.status, 'secondary') }} ms-2">{{ parent.status }}</span>
+    </h4>
+    <div class="text-muted small">{{ parent.enquiry_type or '' }}</div>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{{ url_for('parent_activity_new', parent_id=parent.id) }}" class="btn btn-primary"><i class="bi bi-telephone me-1"></i>Log Activity</a>
+    <a href="{{ url_for('parent_edit', parent_id=parent.id) }}" class="btn btn-outline-secondary"><i class="bi bi-pencil me-1"></i>Edit</a>
+  </div>
+</div>
+
+<div class="row g-4">
+  <div class="col-lg-4">
+
+    <div class="card mb-3">
+      <div class="card-body">
+        <h6 class="fw-bold mb-3 text-muted text-uppercase" style="font-size:.75rem;">Contact</h6>
+        {% if parent.phone %}
+        <div class="mb-2"><a href="tel:{{ parent.phone }}" class="text-decoration-none"><i class="bi bi-telephone me-2 text-muted"></i>{{ parent.phone }}</a></div>
+        {% endif %}
+        {% if parent.email %}
+        <div class="mb-2">
+          <a href="#" onclick="openCompose('{{ parent.email }}', '{{ parent.name|e }}')" class="text-decoration-none">
+            <i class="bi bi-envelope me-2 text-muted"></i>{{ parent.email }}
+          </a>
+        </div>
+        {% endif %}
+        {% if parent.source %}
+        <div class="text-muted small"><i class="bi bi-signpost me-2"></i>Source: {{ parent.source }}</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="card mb-3">
+      <div class="card-body">
+        <h6 class="fw-bold mb-3 text-muted text-uppercase" style="font-size:.75rem;">Enquiry Details</h6>
+        <table class="table table-sm mb-0">
+          <tr><td class="text-muted">Type</td><td class="fw-semibold">{{ parent.enquiry_type or '—' }}</td></tr>
+          <tr><td class="text-muted">Child</td><td class="fw-semibold">{{ parent.child_name or '—' }}</td></tr>
+          <tr><td class="text-muted">Child's Age</td><td class="fw-semibold">{{ parent.child_age or '—' }}</td></tr>
+          <tr><td class="text-muted">Event Date</td><td class="fw-semibold">{{ parent.event_date.strftime('%d %b %Y') if parent.event_date else '—' }}</td></tr>
+          <tr><td class="text-muted">Status</td><td><span class="badge bg-{{ status_colours.get(parent.status, 'secondary') }}">{{ parent.status }}</span></td></tr>
+        </table>
+      </div>
+    </div>
+
+    {% if parent.notes %}
+    <div class="card mb-3">
+      <div class="card-body">
+        <h6 class="fw-bold mb-2 text-muted text-uppercase" style="font-size:.75rem;">Notes</h6>
+        <p class="mb-0 small">{{ parent.notes }}</p>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Attachments -->
+    <div class="card">
+      <div class="card-header fw-bold py-2 d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-paperclip me-1"></i>Documents</span>
+      </div>
+
+      {% if attachments %}
+      <ul class="list-group list-group-flush">
+        {% for att in attachments %}
+        {% set ext = att.original_filename.rsplit('.', 1)[-1].lower() %}
+        {% set icon = 'bi-file-earmark-pdf text-danger' if ext == 'pdf' else ('bi-file-earmark-word text-primary' if ext in ['doc','docx'] else 'bi-file-earmark-image text-success') %}
+        <li class="list-group-item d-flex align-items-center gap-2 py-2">
+          <i class="bi {{ icon }} fs-5 flex-shrink-0"></i>
+          <div class="flex-grow-1 text-truncate">
+            <a href="{{ url_for('attachment_download', attachment_id=att.id) }}" target="_blank"
+               class="text-decoration-none fw-semibold small">{{ att.original_filename }}</a>
+            <div class="text-muted" style="font-size:.75rem;">
+              {{ (att.file_size / 1024) | round(1) }} KB &nbsp;·&nbsp;
+              {{ att.created_at.strftime('%d %b %Y') }}
+              {% if att.user %}&nbsp;·&nbsp;{{ att.user.name }}{% endif %}
+            </div>
+          </div>
+          <form method="post" action="{{ url_for('attachment_delete', attachment_id=att.id) }}"
+                onsubmit="return confirm('Delete this file?')" class="flex-shrink-0">
+            <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-2">
+              <i class="bi bi-trash"></i>
+            </button>
+          </form>
+        </li>
+        {% endfor %}
+      </ul>
+      {% endif %}
+
+      <div class="card-body {% if attachments %}pt-2{% endif %}">
+        <form method="post" action="{{ url_for('attachment_upload', parent_id=parent.id) }}"
+              enctype="multipart/form-data">
+          <div class="d-flex gap-2 align-items-center">
+            <input type="file" name="file" class="form-control form-control-sm"
+                   accept=".pdf,.doc,.docx,.png,.jpg,.jpeg" required>
+            <button type="submit" class="btn btn-sm btn-outline-secondary flex-shrink-0">
+              <i class="bi bi-upload me-1"></i>Upload
+            </button>
+          </div>
+          <div class="form-text">PDF, Word or image · max 16 MB</div>
+        </form>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="col-lg-8">
+    <div class="card">
+      <div class="card-header fw-bold py-2 d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-clock-history me-1"></i>Contact &amp; Email Log</span>
+        <div class="d-flex gap-2">
+          {% if parent.email %}
+          <button class="btn btn-sm btn-outline-success" onclick="openCompose('{{ parent.email }}', '{{ parent.name|e }}')">
+            <i class="bi bi-envelope me-1"></i>Send Email
+          </button>
+          {% endif %}
+          <a href="{{ url_for('parent_activity_new', parent_id=parent.id) }}" class="btn btn-sm btn-primary">+ Log</a>
+        </div>
+      </div>
+      {% set activities = parent.contact_log.all() %}
+      {% set timeline = [] %}
+      {% for a in activities %}{% set _ = timeline.append(('activity', a.created_at, a)) %}{% endfor %}
+      {% for e in email_logs %}{% set _ = timeline.append(('email', e.sent_at, e)) %}{% endfor %}
+      {% set timeline = timeline | sort(attribute='1', reverse=True) %}
+
+      {% if timeline %}
+      <ul class="list-group list-group-flush">
+        {% for kind, ts, item in timeline %}
+
+        {% if kind == 'activity' %}
+        {% set act = item %}
+        {% set icon_map = {'call': 'bi-telephone-fill', 'email': 'bi-envelope-fill', 'meeting': 'bi-people-fill', 'note': 'bi-sticky-fill'} %}
+        {% set color_map = {'call': 'bg-primary', 'email': 'bg-info', 'meeting': 'bg-warning', 'note': 'bg-secondary'} %}
+        <li class="list-group-item">
+          <div class="d-flex gap-3">
+            <div class="activity-icon text-white {{ color_map.get(act.type, 'bg-secondary') }} flex-shrink-0 mt-1">
+              <i class="bi {{ icon_map.get(act.type, 'bi-dot') }}"></i>
+            </div>
+            <div class="flex-grow-1">
+              <div class="d-flex justify-content-between">
+                <div>
+                  <span class="fw-semibold text-capitalize">{{ act.type }}</span>
+                  {% if act.outcome %}<span class="badge bg-light text-dark ms-2">{{ act.outcome }}</span>{% endif %}
+                </div>
+                <small class="text-muted">{{ act.created_at.strftime('%d %b %Y, %H:%M') }}{% if act.user %} · {{ act.user.name }}{% endif %}</small>
+              </div>
+              {% if act.notes %}<p class="mb-1 mt-1 small">{{ act.notes }}</p>{% endif %}
+              {% if act.next_action %}<div class="small text-primary"><i class="bi bi-arrow-right me-1"></i>{{ act.next_action }}</div>{% endif %}
+              {% if act.follow_up_date %}
+              <div class="small {% if act.follow_up_complete %}text-muted text-decoration-line-through{% else %}text-success{% endif %}">
+                <i class="bi bi-calendar me-1"></i>Follow-up: {{ act.follow_up_date.strftime('%d %b %Y') }}
+              </div>
+              {% endif %}
+            </div>
+          </div>
+        </li>
+
+        {% else %}
+        {% set em = item %}
+        {% set status_icon = {'sent': 'bi-send', 'delivered': 'bi-inbox', 'opened': 'bi-eye-fill', 'bounced': 'bi-x-circle', 'error': 'bi-exclamation-circle'} %}
+        {% set status_colour = {'sent': 'text-muted', 'delivered': 'text-primary', 'opened': 'text-success fw-semibold', 'bounced': 'text-danger', 'error': 'text-danger'} %}
+        <li class="list-group-item">
+          <div class="d-flex gap-3">
+            <div class="activity-icon text-white bg-success flex-shrink-0 mt-1">
+              <i class="bi bi-envelope-fill"></i>
+            </div>
+            <div class="flex-grow-1">
+              <div class="d-flex justify-content-between">
+                <div>
+                  <span class="fw-semibold">Email</span>
+                  {% if em.template_name %}<span class="badge bg-light text-dark ms-2">{{ em.template_name }}</span>{% endif %}
+                  <span class="ms-2 small {{ status_colour.get(em.status, 'text-muted') }}">
+                    <i class="bi {{ status_icon.get(em.status, 'bi-send') }} me-1"></i>{{ em.status | capitalize }}
+                    {% if em.opened_at %} · Opened {{ em.opened_at.strftime('%d %b %H:%M') }}
+                    {% elif em.delivered_at %} · Delivered {{ em.delivered_at.strftime('%d %b %H:%M') }}
+                    {% endif %}
+                  </span>
+                </div>
+                <small class="text-muted">{{ em.sent_at.strftime('%d %b %Y, %H:%M') }}{% if em.user %} · {{ em.user.name }}{% endif %}</small>
+              </div>
+              <div class="small text-muted mt-1">
+                <strong>To:</strong> {{ em.to_email }} &nbsp;
+                <strong>Subject:</strong> {{ em.subject }}
+              </div>
+              <div class="mt-2 d-flex gap-2">
+                {% if em.status == 'error' %}
+                <button type="button" class="btn btn-sm btn-outline-warning"
+                  onclick="resendEmail({{ em.id }})">
+                  <i class="bi bi-arrow-clockwise me-1"></i>Review &amp; Resend
+                </button>
+                {% endif %}
+                <form method="post" action="{{ url_for('email_log_delete', log_id=em.id) }}"
+                      onsubmit="return confirm('Delete this email from the log?')">
+                  <button type="submit" class="btn btn-sm btn-outline-danger">
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </form>
+              </div>
+            </div>
+          </div>
+        </li>
+        {% endif %}
+
+        {% endfor %}
+      </ul>
+      {% else %}
+      <div class="card-body text-muted text-center py-5">
+        <i class="bi bi-chat-dots fs-1 d-block mb-2"></i>
+        No contact logged yet.<br>
+        <a href="{{ url_for('parent_activity_new', parent_id=parent.id) }}">Log the first contact</a>
+        {% if parent.email %}or <a href="#" onclick="openCompose('{{ parent.email }}', '{{ parent.name|e }}')">send an email</a>{% endif %}
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+{% include 'email/compose_modal.html' %}
+{% endblock %}

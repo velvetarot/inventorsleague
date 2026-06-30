@@ -1,0 +1,21 @@
+{% extends 'base.html' %}
+{% block title %}Import Schools{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-6">
+    <h4 class="fw-bold mb-4">Import Schools from Zoho CSV</h4>
+    <div class="card p-4">
+      <p class="text-muted">Upload the CSV exported from Zoho CRM. Existing schools are matched by Zoho ID and updated — no duplicates will be created.</p>
+      <form method="post" enctype="multipart/form-data">
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Zoho Accounts CSV</label>
+          <input type="file" name="file" class="form-control" accept=".csv" required>
+        </div>
+        <button type="submit" class="btn btn-primary w-100">
+          <i class="bi bi-upload me-2"></i>Import
+        </button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
