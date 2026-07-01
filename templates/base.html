@@ -49,6 +49,9 @@
     <a href="{{ url_for('pipeline') }}" class="{% if request.endpoint == 'pipeline' %}active{% endif %}">
       <i class="bi bi-kanban me-2"></i>Pipeline
     </a>
+    <a href="{{ url_for('bookings') }}" class="{% if 'booking' in request.endpoint %}active{% endif %}">
+      <i class="bi bi-calendar-check me-2"></i>Bookings
+    </a>
     {% if current_user.is_manager %}
     <a href="{{ url_for('bulk_email') }}" class="{% if request.endpoint == 'bulk_email' %}active{% endif %}">
       <i class="bi bi-envelope-paper me-2"></i>Bulk Email

@@ -1,0 +1,136 @@
+{% extends 'base.html' %}
+{% block title %}{{ booking.title }}{% endblock %}
+{% block content %}
+
+{% set status_colors = {'Enquiry':'secondary','Confirmed':'primary','Invoiced':'warning','Paid':'success','Cancelled':'danger'} %}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h4 class="fw-bold mb-1">{{ booking.title }}</h4>
+    <span class="badge bg-{{ status_colors.get(booking.status, 'secondary') }} me-2">{{ booking.status }}</span>
+    <span class="text-muted small">{{ booking.booking_type }}</span>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{{ url_for('booking_edit', booking_id=booking.id) }}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-pencil me-1"></i>Edit</a>
+    <a href="{{ url_for('bookings') }}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>Back</a>
+  </div>
+</div>
+
+<div class="row g-4">
+
+  <!-- Left: details -->
+  <div class="col-lg-7">
+    <div class="card p-4 mb-4">
+      <h6 class="fw-bold mb-3">Booking Details</h6>
+      <table class="table table-sm table-borderless mb-0">
+        <tbody>
+          <tr><th class="text-muted fw-normal" style="width:160px">Type</th><td>{{ booking.booking_type }}</td></tr>
+          {% if booking.school %}
+          <tr><th class="text-muted fw-normal">School</th><td><a href="{{ url_for('school_detail', school_id=booking.school.id) }}">{{ booking.school.name }}</a></td></tr>
+          {% endif %}
+          {% if booking.client_name %}
+          <tr><th class="text-muted fw-normal">Client</th><td>{{ booking.client_name }}</td></tr>
+          {% endif %}
+          {% if booking.client_email %}
+          <tr><th class="text-muted fw-normal">Email</th><td><a href="mailto:{{ booking.client_email }}">{{ booking.client_email }}</a></td></tr>
+          {% endif %}
+          {% if booking.client_phone %}
+          <tr><th class="text-muted fw-normal">Phone</th><td>{{ booking.client_phone }}</td></tr>
+          {% endif %}
+          <tr><th class="text-muted fw-normal">Date</th><td>{{ booking.event_date.strftime('%A, %d %B %Y') if booking.event_date else '—' }}</td></tr>
+          {% if booking.end_date %}
+          <tr><th class="text-muted fw-normal">Last Session</th><td>{{ booking.end_date.strftime('%A, %d %B %Y') }}</td></tr>
+          {% endif %}
+          {% if booking.num_children %}
+          <tr><th class="text-muted fw-normal">Children</th><td>{{ booking.num_children }}</td></tr>
+          {% endif %}
+          {% if booking.num_weeks %}
+          <tr><th class="text-muted fw-normal">Weeks</th><td>{{ booking.num_weeks }}</td></tr>
+          {% endif %}
+          {% if booking.notes %}
+          <tr><th class="text-muted fw-normal">Notes</th><td>{{ booking.notes }}</td></tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Right: financials -->
+  <div class="col-lg-5">
+    <div class="card p-4 mb-4" style="border-color:#198754">
+      <h6 class="fw-bold mb-3"><i class="bi bi-sterling me-1"></i>Financials</h6>
+
+      {% if booking.flat_fee %}
+      <div class="d-flex justify-content-between mb-2">
+        <span class="text-muted">Flat Fee</span>
+        <span class="fw-semibold">£{{ '{:,.2f}'.format(booking.flat_fee) }}</span>
+      </div>
+      {% else %}
+        {% if booking.num_children %}
+        <div class="d-flex justify-content-between mb-1 text-muted small">
+          <span>{{ booking.num_children }} children</span>
+          {% if booking.num_weeks %}<span>× {{ booking.num_weeks }} weeks</span>{% endif %}
+          <span>× £{{ '{:.2f}'.format(booking.price_per_child or 0) }}</span>
+        </div>
+        {% endif %}
+      {% endif %}
+
+      <hr class="my-2">
+      <div class="d-flex justify-content-between mb-2">
+        <span class="fw-bold">Total Revenue</span>
+        <span class="fw-bold fs-5 text-success">£{{ '{:,.2f}'.format(booking.total_revenue) }}</span>
+      </div>
+      <div class="d-flex justify-content-between mb-2 text-muted">
+        <span>Paid</span>
+        <span>£{{ '{:,.2f}'.format(booking.amount_paid or 0) }}</span>
+      </div>
+      <div class="d-flex justify-content-between">
+        <span class="fw-semibold {% if booking.outstanding > 0 %}text-danger{% endif %}">Outstanding</span>
+        <span class="fw-semibold {% if booking.outstanding > 0 %}text-danger{% endif %}">£{{ '{:,.2f}'.format(booking.outstanding) }}</span>
+      </div>
+    </div>
+
+    <!-- Quick status update -->
+    <div class="card p-4">
+      <h6 class="fw-bold mb-3">Update Status</h6>
+      <form method="post" action="{{ url_for('booking_edit', booking_id=booking.id) }}">
+        <input type="hidden" name="booking_type" value="{{ booking.booking_type }}">
+        <input type="hidden" name="title" value="{{ booking.title }}">
+        <input type="hidden" name="client_name" value="{{ booking.client_name or '' }}">
+        <input type="hidden" name="client_email" value="{{ booking.client_email or '' }}">
+        <input type="hidden" name="client_phone" value="{{ booking.client_phone or '' }}">
+        <input type="hidden" name="event_date" value="{{ booking.event_date.strftime('%Y-%m-%d') if booking.event_date else '' }}">
+        <input type="hidden" name="end_date" value="{{ booking.end_date.strftime('%Y-%m-%d') if booking.end_date else '' }}">
+        <input type="hidden" name="num_children" value="{{ booking.num_children or '' }}">
+        <input type="hidden" name="num_weeks" value="{{ booking.num_weeks or '' }}">
+        <input type="hidden" name="price_per_child" value="{{ booking.price_per_child or '' }}">
+        <input type="hidden" name="flat_fee" value="{{ booking.flat_fee or '' }}">
+        <input type="hidden" name="notes" value="{{ booking.notes or '' }}">
+        <div class="mb-3">
+          <select name="status" class="form-select form-select-sm">
+            {% for s in booking_statuses %}
+            <option {% if s==booking.status %}selected{% endif %}>{{ s }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label small">Amount Paid (£)</label>
+          <input type="number" name="amount_paid" class="form-control form-control-sm" step="0.01" value="{{ booking.amount_paid or '' }}" placeholder="0.00">
+        </div>
+        <button type="submit" class="btn btn-success btn-sm w-100"><i class="bi bi-check-lg me-1"></i>Update</button>
+      </form>
+    </div>
+
+  </div>
+</div>
+
+<!-- Delete -->
+{% if current_user.can_delete %}
+<div class="mt-4">
+  <form method="post" action="{{ url_for('booking_delete', booking_id=booking.id) }}" onsubmit="return confirm('Delete this booking?')">
+    <button type="submit" class="btn btn-outline-danger btn-sm"><i class="bi bi-trash me-1"></i>Delete Booking</button>
+  </form>
+</div>
+{% endif %}
+
+{% endblock %}

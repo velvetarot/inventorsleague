@@ -232,6 +232,47 @@ class EmailLog(db.Model):
         return None
 
 
+class Booking(db.Model):
+    __tablename__ = 'bookings'
+    id = db.Column(db.Integer, primary_key=True)
+    school_id = db.Column(db.Integer, db.ForeignKey('schools.id'), nullable=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
+    booking_type = db.Column(db.String(50), nullable=False)  # Birthday Party / Workshop / After School Club
+    title = db.Column(db.String(200), nullable=False)
+    client_name = db.Column(db.String(200))   # for non-school bookings
+    client_email = db.Column(db.String(150))
+    client_phone = db.Column(db.String(30))
+    event_date = db.Column(db.Date)
+    end_date = db.Column(db.Date)             # for term clubs: last session date
+    num_children = db.Column(db.Integer)
+    num_weeks = db.Column(db.Integer)         # for term clubs
+    price_per_child = db.Column(db.Float)     # per session for clubs, flat per child for parties
+    flat_fee = db.Column(db.Float)            # alternative to per-child pricing
+    notes = db.Column(db.Text)
+    status = db.Column(db.String(30), default='Enquiry')  # Enquiry / Confirmed / Invoiced / Paid / Cancelled
+    invoice_number = db.Column(db.String(50))
+    invoice_sent_at = db.Column(db.DateTime)
+    paid_at = db.Column(db.DateTime)
+    amount_paid = db.Column(db.Float)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    school = db.relationship('School', backref='bookings')
+    user = db.relationship('User', backref='bookings')
+
+    @property
+    def total_revenue(self):
+        if self.flat_fee:
+            return self.flat_fee
+        if self.booking_type == 'After School Club':
+            return (self.num_children or 0) * (self.num_weeks or 0) * (self.price_per_child or 0)
+        return (self.num_children or 0) * (self.price_per_child or 0)
+
+    @property
+    def outstanding(self):
+        return (self.total_revenue or 0) - (self.amount_paid or 0)
+
+
 class Activity(db.Model):
     __tablename__ = 'activities'
     id = db.Column(db.Integer, primary_key=True)

@@ -1,0 +1,104 @@
+{% extends 'base.html' %}
+{% block title %}Bookings{% endblock %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="fw-bold mb-0">Bookings</h4>
+  <a href="{{ url_for('booking_new') }}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg me-1"></i>New Booking</a>
+</div>
+
+<!-- Summary cards -->
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-4">
+    <div class="card stat-card p-3" style="border-color:#198754">
+      <div class="text-muted small">Total Revenue</div>
+      <div class="fs-3 fw-bold">£{{ '{:,.0f}'.format(total_revenue) }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-4">
+    <div class="card stat-card p-3" style="border-color:#0d6efd">
+      <div class="text-muted small">Paid</div>
+      <div class="fs-3 fw-bold">£{{ '{:,.0f}'.format(total_paid) }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-4">
+    <div class="card stat-card p-3" style="border-color:#ffc107">
+      <div class="text-muted small">Outstanding</div>
+      <div class="fs-3 fw-bold">£{{ '{:,.0f}'.format(total_outstanding) }}</div>
+    </div>
+  </div>
+</div>
+
+<!-- Filters -->
+<form method="get" class="card p-3 mb-3">
+  <div class="row g-2 align-items-end">
+    <div class="col-auto">
+      <select name="type" class="form-select form-select-sm">
+        <option value="">All types</option>
+        {% for t in booking_types %}
+        <option {% if t==type_filter %}selected{% endif %}>{{ t }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-auto">
+      <select name="status" class="form-select form-select-sm">
+        <option value="">All statuses</option>
+        {% for s in booking_statuses %}
+        <option {% if s==status_filter %}selected{% endif %}>{{ s }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-auto">
+      <button type="submit" class="btn btn-sm btn-outline-secondary">Filter</button>
+      <a href="{{ url_for('bookings') }}" class="btn btn-sm btn-link">Clear</a>
+    </div>
+  </div>
+</form>
+
+{% set status_colors = {'Enquiry':'secondary','Confirmed':'primary','Invoiced':'warning','Paid':'success','Cancelled':'danger'} %}
+{% set type_icons = {'Birthday Party':'bi-balloon-heart','Workshop (Half Day)':'bi-easel','Workshop (Full Day)':'bi-easel-fill','After School Club':'bi-clock','Holiday Camp':'bi-sun','Assembly':'bi-megaphone','Other':'bi-calendar-event'} %}
+
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-hover mb-0 align-middle">
+      <thead>
+        <tr>
+          <th>Booking</th>
+          <th>Type</th>
+          <th>Date</th>
+          <th>Children</th>
+          <th>Revenue</th>
+          <th>Paid</th>
+          <th>Status</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for b in bookings %}
+      <tr>
+        <td>
+          <a href="{{ url_for('booking_detail', booking_id=b.id) }}" class="fw-semibold text-decoration-none">{{ b.title }}</a>
+          {% if b.school %}
+          <div class="text-muted small">{{ b.school.name }}</div>
+          {% elif b.client_name %}
+          <div class="text-muted small">{{ b.client_name }}</div>
+          {% endif %}
+        </td>
+        <td><span class="text-muted small"><i class="bi {{ type_icons.get(b.booking_type, 'bi-calendar-event') }} me-1"></i>{{ b.booking_type }}</span></td>
+        <td class="text-muted small">{{ b.event_date.strftime('%d %b %Y') if b.event_date else '—' }}</td>
+        <td class="text-muted small">{{ b.num_children or '—' }}</td>
+        <td class="fw-semibold">£{{ '{:,.0f}'.format(b.total_revenue) }}</td>
+        <td class="text-muted small">£{{ '{:,.0f}'.format(b.amount_paid or 0) }}</td>
+        <td><span class="badge bg-{{ status_colors.get(b.status, 'secondary') }}">{{ b.status }}</span></td>
+        <td>
+          <a href="{{ url_for('booking_edit', booking_id=b.id) }}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-pencil"></i></a>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="8" class="text-center text-muted py-4">No bookings yet. <a href="{{ url_for('booking_new') }}">Add your first one.</a></td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

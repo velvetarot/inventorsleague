@@ -5,7 +5,7 @@ from werkzeug.utils import secure_filename
 from flask import Flask, render_template, redirect, url_for, request, flash, jsonify
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from sqlalchemy import or_, func
-from models import db, User, School, Activity, Parent, ParentActivity, EmailTemplate, EmailLog, Attachment, Message
+from models import db, User, School, Activity, Parent, ParentActivity, EmailTemplate, EmailLog, Attachment, Message, Booking
 from brevo import send_email
 from dotenv import load_dotenv
 
@@ -991,6 +991,120 @@ def brevo_webhook():
             log.bounced_at = ts
         db.session.commit()
     return '', 200
+
+
+# ── Bookings ──────────────────────────────────────────────────────────────────
+
+BOOKING_TYPES = ['Birthday Party', 'Workshop (Half Day)', 'Workshop (Full Day)', 'After School Club', 'Holiday Camp', 'Assembly', 'Other']
+BOOKING_STATUSES = ['Enquiry', 'Confirmed', 'Invoiced', 'Paid', 'Cancelled']
+
+@app.route('/bookings')
+@login_required
+def bookings():
+    status_filter = request.args.get('status', '')
+    type_filter = request.args.get('type', '')
+    q = Booking.query
+    if status_filter:
+        q = q.filter(Booking.status == status_filter)
+    if type_filter:
+        q = q.filter(Booking.booking_type == type_filter)
+    all_bookings = q.order_by(Booking.event_date.desc()).all()
+    total_revenue = sum(b.total_revenue for b in all_bookings if b.status != 'Cancelled')
+    total_paid = sum((b.amount_paid or 0) for b in all_bookings if b.status != 'Cancelled')
+    total_outstanding = total_revenue - total_paid
+    return render_template('bookings/index.html',
+        bookings=all_bookings,
+        booking_types=BOOKING_TYPES,
+        booking_statuses=BOOKING_STATUSES,
+        status_filter=status_filter,
+        type_filter=type_filter,
+        total_revenue=total_revenue,
+        total_paid=total_paid,
+        total_outstanding=total_outstanding,
+    )
+
+@app.route('/bookings/new', methods=['GET', 'POST'])
+@login_required
+def booking_new():
+    schools = School.query.order_by(School.name).all()
+    if request.method == 'POST':
+        school_id = request.form.get('school_id', type=int) or None
+        num_children = request.form.get('num_children', type=int)
+        num_weeks = request.form.get('num_weeks', type=int)
+        price_per_child = request.form.get('price_per_child', type=float)
+        flat_fee = request.form.get('flat_fee', type=float)
+        event_date_str = request.form.get('event_date')
+        end_date_str = request.form.get('end_date')
+        b = Booking(
+            school_id=school_id,
+            user_id=current_user.id,
+            booking_type=request.form.get('booking_type'),
+            title=request.form.get('title', '').strip(),
+            client_name=request.form.get('client_name', '').strip(),
+            client_email=request.form.get('client_email', '').strip(),
+            client_phone=request.form.get('client_phone', '').strip(),
+            event_date=datetime.strptime(event_date_str, '%Y-%m-%d').date() if event_date_str else None,
+            end_date=datetime.strptime(end_date_str, '%Y-%m-%d').date() if end_date_str else None,
+            num_children=num_children,
+            num_weeks=num_weeks,
+            price_per_child=price_per_child,
+            flat_fee=flat_fee,
+            notes=request.form.get('notes', '').strip(),
+            status=request.form.get('status', 'Enquiry'),
+        )
+        db.session.add(b)
+        db.session.commit()
+        flash('Booking created.', 'success')
+        return redirect(url_for('booking_detail', booking_id=b.id))
+    return render_template('bookings/new.html', schools=schools, booking_types=BOOKING_TYPES, booking_statuses=BOOKING_STATUSES)
+
+@app.route('/bookings/<int:booking_id>')
+@login_required
+def booking_detail(booking_id):
+    b = Booking.query.get_or_404(booking_id)
+    return render_template('bookings/detail.html', booking=b, booking_types=BOOKING_TYPES, booking_statuses=BOOKING_STATUSES)
+
+@app.route('/bookings/<int:booking_id>/edit', methods=['GET', 'POST'])
+@login_required
+def booking_edit(booking_id):
+    b = Booking.query.get_or_404(booking_id)
+    schools = School.query.order_by(School.name).all()
+    if request.method == 'POST':
+        b.school_id = request.form.get('school_id', type=int) or None
+        b.booking_type = request.form.get('booking_type')
+        b.title = request.form.get('title', '').strip()
+        b.client_name = request.form.get('client_name', '').strip()
+        b.client_email = request.form.get('client_email', '').strip()
+        b.client_phone = request.form.get('client_phone', '').strip()
+        event_date_str = request.form.get('event_date')
+        end_date_str = request.form.get('end_date')
+        b.event_date = datetime.strptime(event_date_str, '%Y-%m-%d').date() if event_date_str else None
+        b.end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date() if end_date_str else None
+        b.num_children = request.form.get('num_children', type=int)
+        b.num_weeks = request.form.get('num_weeks', type=int)
+        b.price_per_child = request.form.get('price_per_child', type=float)
+        b.flat_fee = request.form.get('flat_fee', type=float)
+        b.notes = request.form.get('notes', '').strip()
+        b.status = request.form.get('status', b.status)
+        amount_paid = request.form.get('amount_paid', type=float)
+        if amount_paid is not None:
+            b.amount_paid = amount_paid
+            if amount_paid >= b.total_revenue and b.status != 'Paid':
+                b.status = 'Paid'
+                b.paid_at = datetime.utcnow()
+        db.session.commit()
+        flash('Booking updated.', 'success')
+        return redirect(url_for('booking_detail', booking_id=b.id))
+    return render_template('bookings/edit.html', booking=b, schools=schools, booking_types=BOOKING_TYPES, booking_statuses=BOOKING_STATUSES)
+
+@app.route('/bookings/<int:booking_id>/delete', methods=['POST'])
+@login_required
+def booking_delete(booking_id):
+    b = Booking.query.get_or_404(booking_id)
+    db.session.delete(b)
+    db.session.commit()
+    flash('Booking deleted.', 'success')
+    return redirect(url_for('bookings'))
 
 
 # ── Data Import ───────────────────────────────────────────────────────────────

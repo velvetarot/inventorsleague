@@ -168,7 +168,7 @@
       <div class="fw-bold mb-3"><i class="bi bi-funnel me-1"></i> Schools by Tier</div>
       {% set tier_labels = {'A':'Call Now','B':'Call This Week','C':'Keep Warm','D':'Low Priority','Z':'Not Interested'} %}
       <ul class="list-group list-group-flush">
-        {% for tier, count in tier_counts | sort %}
+        {% for tier, count in tier_counts | sort(attribute='0') %}
         {% if tier %}
         <li class="list-group-item px-0 d-flex justify-content-between align-items-center">
           <span><span class="badge badge-tier-{{ tier }} me-2">{{ tier }}</span>{{ tier_labels.get(tier, tier) }}</span>

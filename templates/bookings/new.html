@@ -1,0 +1,155 @@
+{% extends 'base.html' %}
+{% block title %}New Booking{% endblock %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h4 class="fw-bold mb-0">New Booking</h4>
+  <a href="{{ url_for('bookings') }}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>Back</a>
+</div>
+
+<form method="post">
+  <div class="row g-4">
+
+    <!-- Left column -->
+    <div class="col-lg-7">
+      <div class="card p-4 mb-4">
+        <h6 class="fw-bold mb-3">Booking Details</h6>
+
+        <div class="mb-3">
+          <label class="form-label">Booking Type <span class="text-danger">*</span></label>
+          <select name="booking_type" class="form-select" id="booking_type" required onchange="updateForm()">
+            <option value="">— Select type —</option>
+            {% for t in booking_types %}
+            <option>{{ t }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Title / Description <span class="text-danger">*</span></label>
+          <input type="text" name="title" class="form-control" required placeholder="e.g. Robotics Birthday Party — Liam, Age 8">
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Linked School <span class="text-muted small">(optional)</span></label>
+          <select name="school_id" class="form-select">
+            <option value="">— No school —</option>
+            {% for s in schools %}
+            <option value="{{ s.id }}">{{ s.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label" id="date_label">Event Date</label>
+            <input type="date" name="event_date" class="form-control">
+          </div>
+          <div class="col-md-6" id="end_date_row" style="display:none">
+            <label class="form-label">Last Session Date</label>
+            <input type="date" name="end_date" class="form-control">
+          </div>
+        </div>
+
+        <div class="mb-3 mt-3">
+          <label class="form-label">Status</label>
+          <select name="status" class="form-select">
+            {% for s in booking_statuses %}
+            <option {% if s=='Confirmed' %}selected{% endif %}>{{ s }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Notes</label>
+          <textarea name="notes" class="form-control" rows="3" placeholder="Any additional details…"></textarea>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right column -->
+    <div class="col-lg-5">
+
+      <!-- Client details -->
+      <div class="card p-4 mb-4" id="client_card">
+        <h6 class="fw-bold mb-3">Client Details</h6>
+        <div class="mb-3">
+          <label class="form-label">Client Name</label>
+          <input type="text" name="client_name" class="form-control" placeholder="Parent or contact name">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Email</label>
+          <input type="text" name="client_email" class="form-control" placeholder="email@example.com">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Phone</label>
+          <input type="text" name="client_phone" class="form-control" placeholder="07700 000000">
+        </div>
+      </div>
+
+      <!-- Revenue calculator -->
+      <div class="card p-4" style="border-color:#198754">
+        <h6 class="fw-bold mb-3"><i class="bi bi-calculator me-1"></i>Revenue Calculator</h6>
+
+        <div id="pricing_perchild">
+          <div class="row g-2 mb-2">
+            <div class="col">
+              <label class="form-label small">No. of Children</label>
+              <input type="number" name="num_children" id="num_children" class="form-control" min="1" placeholder="0" oninput="calcRevenue()">
+            </div>
+            <div class="col" id="weeks_col" style="display:none">
+              <label class="form-label small">No. of Weeks</label>
+              <input type="number" name="num_weeks" id="num_weeks" class="form-control" min="1" placeholder="0" oninput="calcRevenue()">
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label small" id="price_label">Price per Child (£)</label>
+            <input type="number" name="price_per_child" id="price_per_child" class="form-control" step="0.01" min="0" placeholder="0.00" oninput="calcRevenue()">
+          </div>
+        </div>
+
+        <div id="pricing_flat" style="display:none">
+          <div class="mb-3">
+            <label class="form-label small">Flat Fee (£)</label>
+            <input type="number" name="flat_fee" id="flat_fee" class="form-control" step="0.01" min="0" placeholder="0.00" oninput="calcRevenue()">
+          </div>
+        </div>
+
+        <div class="bg-success bg-opacity-10 rounded p-3 text-center">
+          <div class="text-muted small mb-1">Total Revenue</div>
+          <div class="fs-2 fw-bold text-success" id="revenue_display">£0</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="mt-3">
+    <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>Save Booking</button>
+    <a href="{{ url_for('bookings') }}" class="btn btn-outline-secondary ms-2">Cancel</a>
+  </div>
+</form>
+
+<script>
+function updateForm() {
+  const type = document.getElementById('booking_type').value;
+  const isClub = type === 'After School Club' || type === 'Holiday Camp';
+  const isFlat = false; // all use per-child for now
+
+  document.getElementById('weeks_col').style.display = isClub ? '' : 'none';
+  document.getElementById('end_date_row').style.display = isClub ? '' : 'none';
+  document.getElementById('price_label').textContent = isClub ? 'Price per Child per Week (£)' : 'Price per Child (£)';
+  calcRevenue();
+}
+
+function calcRevenue() {
+  const type = document.getElementById('booking_type').value;
+  const isClub = type === 'After School Club' || type === 'Holiday Camp';
+  const children = parseFloat(document.getElementById('num_children').value) || 0;
+  const weeks = parseFloat(document.getElementById('num_weeks')?.value) || 1;
+  const price = parseFloat(document.getElementById('price_per_child').value) || 0;
+  const total = isClub ? children * weeks * price : children * price;
+  document.getElementById('revenue_display').textContent = '£' + total.toLocaleString('en-GB', {minimumFractionDigits: 0, maximumFractionDigits: 0});
+}
+</script>
+{% endblock %}
