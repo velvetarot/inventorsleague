@@ -216,15 +216,15 @@ function loadTemplate() {
     .then(r => r.json())
     .then(t => {
       document.getElementById('compose_subject').value = applyMergeFields(t.subject);
-      // Replace the generic "Dear {{first_name}}" opening with role-appropriate salutation
-      let body = t.body_html;
+      // Apply merge fields first, then fix the salutation
+      let body = applyMergeFields(t.body_html);
       if (currentRecipient && currentRecipient.salutation) {
         const fn = firstName(currentRecipient.name);
         const salutation = currentRecipient.salutation.replace('{{first_name}}', fn);
-        // Replace any Dear ... opening line regardless of what placeholder was used
-        body = body.replace(/^Dear\s+[^\n,]+/m, salutation);
+        // Replace "Dear <anything up to comma or newline>" at start of body
+        body = body.replace(/^Dear[^,\n]*/m, salutation);
       }
-      document.getElementById('compose_body').value = applyMergeFields(body);
+      document.getElementById('compose_body').value = body;
       document.getElementById('compose_template_name').value = t.name;
     });
 }
