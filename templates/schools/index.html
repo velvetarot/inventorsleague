@@ -16,7 +16,7 @@
     <div class="col-auto">
       <select name="phase" class="form-select form-select-sm">
         <option value="">All phases</option>
-        {% for p in phases %}<option value="{{ p }}" {% if p==phase %}selected{% endif %}>{{ 'Independent/Private' if p == 'Not applicable' else p }}</option>{% endfor %}
+        {% for p in phases %}<option value="{{ p }}" {% if p==phase %}selected{% endif %}>{{ p }}</option>{% endfor %}
       </select>
     </div>
     <div class="col-auto">
@@ -24,7 +24,7 @@
       <select name="tier" class="form-select form-select-sm">
         <option value="">All tiers</option>
         <option value="I" {% if tier=='I' %}selected{% endif %}>I — Newly Imported</option>
-        {% for t in tiers %}<option value="{{ t }}" {% if t==tier %}selected{% endif %}>{{ tier_labels.get(t, t) }}</option>{% endfor %}
+        {% for t in tiers %}{% if t != 'I' %}<option value="{{ t }}" {% if t==tier %}selected{% endif %}>{{ tier_labels.get(t, t) }}</option>{% endif %}{% endfor %}
       </select>
     </div>
     <div class="col-auto">
@@ -109,7 +109,7 @@
           {% if s.won %}<span class="badge bg-success ms-1">Won</span>{% endif %}
           <div class="text-muted small">{{ s.city or '' }}{% if s.postcode %} {{ s.postcode }}{% endif %}</div>
         </td>
-        <td><span class="text-muted small">{{ 'Independent/Private' if s.phase == 'Not applicable' else (s.phase or '—') }}</span></td>
+        <td><span class="text-muted small">{{ s.phase or '—' }}</span></td>
         <td>
           {% set tier_labels = {'A': 'Call Now', 'B': 'Call This Week', 'C': 'Keep Warm', 'D': 'Low Priority', 'Z': 'Not Interested'} %}
           {% if s.priority_tier %}
