@@ -52,7 +52,7 @@
     <a href="{{ url_for('bookings') }}" class="{% if 'booking' in request.endpoint %}active{% endif %}">
       <i class="bi bi-calendar-check me-2"></i>Bookings
     </a>
-    <a href="{{ url_for('finance_dashboard') }}" class="{% if request.endpoint == 'finance_dashboard' %}active{% endif %}">
+    <a href="{{ url_for('finance_dashboard') }}" class="{% if request.endpoint in ('finance_dashboard','finance_reports','finance_export') %}active{% endif %}">
       <i class="bi bi-sterling me-2"></i>Finance
     </a>
     {% if current_user.is_manager %}

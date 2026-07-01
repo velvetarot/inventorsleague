@@ -1,0 +1,196 @@
+{% extends 'base.html' %}
+{% block title %}Finance Reports{% endblock %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h4 class="fw-bold mb-0">Finance Reports</h4>
+  <div class="d-flex gap-2 align-items-center">
+    <!-- Year picker -->
+    <form method="get" class="d-flex align-items-center gap-2">
+      <select name="year" class="form-select form-select-sm" onchange="this.form.submit()">
+        {% for y in years_available %}
+        <option {% if y==year %}selected{% endif %}>{{ y }}</option>
+        {% endfor %}
+      </select>
+    </form>
+    <a href="{{ url_for('finance_export', year=year) }}" class="btn btn-outline-success btn-sm">
+      <i class="bi bi-download me-1"></i>Export CSV
+    </a>
+    <a href="{{ url_for('finance_dashboard') }}" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-arrow-left me-1"></i>Dashboard
+    </a>
+  </div>
+</div>
+
+<!-- Year summary cards -->
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3">
+    <div class="card stat-card p-3" style="border-color:#198754">
+      <div class="text-muted small">{{ year }} Revenue</div>
+      <div class="fs-3 fw-bold">£{{ '{:,.0f}'.format(total_revenue) }}</div>
+      {% if prev_revenue %}
+      <div class="text-muted" style="font-size:.75rem;">
+        {% set diff = total_revenue - prev_revenue %}
+        {% if diff >= 0 %}
+        <span class="text-success">▲ £{{ '{:,.0f}'.format(diff) }}</span>
+        {% else %}
+        <span class="text-danger">▼ £{{ '{:,.0f}'.format(diff|abs) }}</span>
+        {% endif %}
+        vs {{ year - 1 }}
+      </div>
+      {% endif %}
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card stat-card p-3" style="border-color:#0d6efd">
+      <div class="text-muted small">Collected</div>
+      <div class="fs-3 fw-bold">£{{ '{:,.0f}'.format(total_paid) }}</div>
+      {% if total_revenue > 0 %}
+      <div class="text-muted" style="font-size:.75rem;">{{ '{:.0f}'.format(total_paid / total_revenue * 100) }}% collected</div>
+      {% endif %}
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card stat-card p-3" style="border-color:#ffc107">
+      <div class="text-muted small">Outstanding</div>
+      <div class="fs-3 fw-bold">£{{ '{:,.0f}'.format(total_out) }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card stat-card p-3" style="border-color:#6f42c1">
+      <div class="text-muted small">vs {{ year - 1 }}</div>
+      <div class="fs-3 fw-bold">
+        {% if prev_revenue > 0 %}
+        {% set pct = ((total_revenue - prev_revenue) / prev_revenue * 100) %}
+        <span class="{{ 'text-success' if pct >= 0 else 'text-danger' }}">
+          {{ '+' if pct >= 0 }}{{ '{:.0f}'.format(pct) }}%
+        </span>
+        {% else %}
+        —
+        {% endif %}
+      </div>
+      <div class="text-muted" style="font-size:.75rem;">Year on year</div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4">
+
+  <!-- Monthly bar chart -->
+  <div class="col-12">
+    <div class="card p-3">
+      <div class="fw-bold mb-3"><i class="bi bi-bar-chart me-1"></i> Monthly Revenue — {{ year }}</div>
+      {% set max_rev = monthly.values() | map(attribute='revenue') | max %}
+      <div class="d-flex align-items-end gap-1" style="height:160px;">
+        {% for month, data in monthly.items() %}
+        {% set rev_pct  = (data.revenue / max_rev * 100) if max_rev > 0 else 0 %}
+        {% set paid_pct = (data.paid    / max_rev * 100) if max_rev > 0 else 0 %}
+        <div class="flex-grow-1 d-flex flex-column align-items-center position-relative">
+          {% if data.revenue > 0 %}
+          <div class="text-muted mb-1" style="font-size:.65rem;">£{{ '{:,.0f}'.format(data.revenue) }}</div>
+          {% else %}
+          <div class="mb-1" style="font-size:.65rem;">&nbsp;</div>
+          {% endif %}
+          <div class="w-100 position-relative rounded-top" style="height:{{ [rev_pct,2]|max }}%;min-height:2px;background:#dee2e6;">
+            <div class="position-absolute bottom-0 start-0 end-0 rounded-top bg-success" style="height:{{ (paid_pct/rev_pct*100)|round if rev_pct > 0 else 0 }}%;"></div>
+          </div>
+          <div class="text-muted mt-1" style="font-size:.7rem;">{{ month }}</div>
+        </div>
+        {% endfor %}
+      </div>
+      <div class="d-flex gap-3 mt-2 justify-content-center" style="font-size:.75rem;">
+        <span><span class="d-inline-block bg-secondary rounded me-1" style="width:12px;height:12px;"></span>Revenue</span>
+        <span><span class="d-inline-block bg-success rounded me-1" style="width:12px;height:12px;"></span>Collected</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Revenue by school -->
+  <div class="col-lg-7">
+    <div class="card">
+      <div class="card-header fw-bold py-2"><i class="bi bi-building me-1"></i> Revenue by School / Client ({{ year }})</div>
+      {% if by_school %}
+      <div class="table-responsive">
+        <table class="table table-sm table-hover mb-0 align-middle">
+          <thead><tr><th>School / Client</th><th class="text-center">Bookings</th><th class="text-end">Revenue</th><th class="text-end">Paid</th><th class="text-end">Outstanding</th></tr></thead>
+          <tbody>
+          {% for name, data in by_school.items() %}
+          <tr>
+            <td class="fw-semibold small">{{ name }}</td>
+            <td class="text-center text-muted small">{{ data.bookings }}</td>
+            <td class="text-end fw-semibold">£{{ '{:,.2f}'.format(data.revenue) }}</td>
+            <td class="text-end text-success">£{{ '{:,.2f}'.format(data.paid) }}</td>
+            <td class="text-end {% if data.revenue - data.paid > 0 %}text-danger{% else %}text-muted{% endif %}">
+              £{{ '{:,.2f}'.format(data.revenue - data.paid) }}
+            </td>
+          </tr>
+          {% endfor %}
+          </tbody>
+          <tfoot class="fw-bold">
+            <tr>
+              <td>Total</td>
+              <td></td>
+              <td class="text-end">£{{ '{:,.2f}'.format(total_revenue) }}</td>
+              <td class="text-end text-success">£{{ '{:,.2f}'.format(total_paid) }}</td>
+              <td class="text-end text-danger">£{{ '{:,.2f}'.format(total_out) }}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+      {% else %}
+      <div class="card-body text-muted small">No bookings for {{ year }}.</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Revenue by type + outstanding debt -->
+  <div class="col-lg-5">
+
+    <div class="card p-3 mb-4">
+      <div class="fw-bold mb-3"><i class="bi bi-tag me-1"></i> Revenue by Type ({{ year }})</div>
+      {% if by_type %}
+      <ul class="list-group list-group-flush">
+        {% for btype, data in by_type.items() %}
+        {% set pct = (data.revenue / total_revenue * 100) if total_revenue > 0 else 0 %}
+        <li class="list-group-item px-0">
+          <div class="d-flex justify-content-between mb-1">
+            <span class="small">{{ btype }} <span class="text-muted">({{ data.count }})</span></span>
+            <span class="fw-semibold small">£{{ '{:,.0f}'.format(data.revenue) }}</span>
+          </div>
+          <div class="progress" style="height:4px;">
+            <div class="progress-bar bg-success" style="width:{{ pct|round }}%"></div>
+          </div>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p class="text-muted small mb-0">No bookings yet.</p>
+      {% endif %}
+    </div>
+
+    <div class="card">
+      <div class="card-header fw-bold py-2"><i class="bi bi-exclamation-circle me-1"></i> Outstanding Debt</div>
+      {% if outstanding %}
+      <ul class="list-group list-group-flush">
+        {% for b in outstanding %}
+        <li class="list-group-item {% if b.is_overdue %}list-group-item-danger{% endif %}">
+          <div class="d-flex justify-content-between align-items-start">
+            <div>
+              <a href="{{ url_for('booking_detail', booking_id=b.id) }}" class="small fw-semibold text-decoration-none">{{ b.title }}</a>
+              {% if b.is_overdue %}<span class="badge bg-danger ms-1">Overdue</span>{% endif %}
+              <div class="text-muted" style="font-size:.75rem;">{{ b.invoice_number or 'No invoice' }} · {{ b.event_date.strftime('%d %b %Y') if b.event_date else '' }}</div>
+            </div>
+            <span class="fw-bold text-danger">£{{ '{:,.2f}'.format(b.outstanding) }}</span>
+          </div>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <div class="card-body text-muted small">No outstanding debt.</div>
+      {% endif %}
+    </div>
+
+  </div>
+
+</div>
+{% endblock %}

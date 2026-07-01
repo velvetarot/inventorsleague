@@ -1458,6 +1458,115 @@ def finance_dashboard():
     )
 
 
+# ── Finance Reports ───────────────────────────────────────────────────────────
+
+@app.route('/finance/reports')
+@login_required
+def finance_reports():
+    import calendar
+    now = datetime.utcnow()
+    year = request.args.get('year', now.year, type=int)
+    years_available = sorted(set(
+        b.event_date.year for b in Booking.query.all() if b.event_date
+    ), reverse=True) or [now.year]
+
+    bookings = Booking.query.filter(Booking.status != 'Cancelled').all()
+    year_bookings = [b for b in bookings if b.event_date and b.event_date.year == year]
+
+    # Revenue by month
+    monthly = {}
+    for m in range(1, 13):
+        label = calendar.month_abbr[m]
+        month_b = [b for b in year_bookings if b.event_date.month == m]
+        monthly[label] = {
+            'revenue': sum(b.total_revenue for b in month_b),
+            'paid':    sum(b.total_paid for b in month_b),
+        }
+
+    # Revenue by school
+    by_school = {}
+    for b in year_bookings:
+        name = b.school.name if b.school else (b.client_name or 'Private Client')
+        if name not in by_school:
+            by_school[name] = {'revenue': 0, 'paid': 0, 'bookings': 0}
+        by_school[name]['revenue']  += b.total_revenue
+        by_school[name]['paid']     += b.total_paid
+        by_school[name]['bookings'] += 1
+    by_school = dict(sorted(by_school.items(), key=lambda x: x[1]['revenue'], reverse=True))
+
+    # Revenue by booking type
+    by_type = {}
+    for b in year_bookings:
+        if b.booking_type not in by_type:
+            by_type[b.booking_type] = {'revenue': 0, 'paid': 0, 'count': 0}
+        by_type[b.booking_type]['revenue']  += b.total_revenue
+        by_type[b.booking_type]['paid']     += b.total_paid
+        by_type[b.booking_type]['count']    += 1
+    by_type = dict(sorted(by_type.items(), key=lambda x: x[1]['revenue'], reverse=True))
+
+    # Outstanding debt list
+    outstanding = [b for b in bookings if b.outstanding > 0 and b.status not in ('Cancelled',)]
+    outstanding.sort(key=lambda b: b.event_date or date.today())
+
+    # Year totals
+    total_revenue  = sum(b.total_revenue for b in year_bookings)
+    total_paid     = sum(b.total_paid for b in year_bookings)
+    total_out      = total_revenue - total_paid
+
+    # Previous year comparison
+    prev_year_b = [b for b in bookings if b.event_date and b.event_date.year == year - 1]
+    prev_revenue = sum(b.total_revenue for b in prev_year_b)
+
+    return render_template('finance/reports.html',
+        year=year, years_available=years_available,
+        monthly=monthly,
+        by_school=by_school,
+        by_type=by_type,
+        outstanding=outstanding,
+        total_revenue=total_revenue,
+        total_paid=total_paid,
+        total_out=total_out,
+        prev_revenue=prev_revenue,
+        now=now,
+    )
+
+
+@app.route('/finance/reports/export')
+@login_required
+def finance_export():
+    import csv, io as _io
+    year = request.args.get('year', datetime.utcnow().year, type=int)
+    bookings = [b for b in Booking.query.filter(Booking.status != 'Cancelled').all()
+                if b.event_date and b.event_date.year == year]
+    bookings.sort(key=lambda b: b.event_date)
+
+    out = _io.StringIO()
+    writer = csv.writer(out)
+    writer.writerow(['Invoice No', 'Title', 'Type', 'School/Client', 'Date',
+                     'Children', 'Weeks', 'Price/Child', 'Flat Fee',
+                     'Total Revenue', 'Total Paid', 'Outstanding', 'Status'])
+    for b in bookings:
+        writer.writerow([
+            b.invoice_number or '',
+            b.title,
+            b.booking_type,
+            b.school.name if b.school else (b.client_name or ''),
+            b.event_date.strftime('%d/%m/%Y') if b.event_date else '',
+            b.num_children or '',
+            b.num_weeks or '',
+            b.price_per_child or '',
+            b.flat_fee or '',
+            f'{b.total_revenue:.2f}',
+            f'{b.total_paid:.2f}',
+            f'{b.outstanding:.2f}',
+            b.status,
+        ])
+    out.seek(0)
+    buf = io.BytesIO(out.read().encode('utf-8-sig'))  # utf-8-sig for Excel compatibility
+    return send_file(buf, mimetype='text/csv', as_attachment=True,
+                     download_name=f'InventorsLeague-Finance-{year}.csv')
+
+
 # ── Data Import ───────────────────────────────────────────────────────────────
 
 @app.route('/admin/import', methods=['GET', 'POST'])
