@@ -124,6 +124,41 @@
   </div>
 </div>
 
+<!-- Invoice panel -->
+<div class="card p-4 mt-4">
+  <h6 class="fw-bold mb-3"><i class="bi bi-receipt me-1"></i>Invoice</h6>
+  {% if booking.invoice_number %}
+  <p class="text-muted small mb-3">Invoice <strong>{{ booking.invoice_number }}</strong>
+    {% if booking.invoice_sent_at %} — sent {{ booking.invoice_sent_at.strftime('%d %b %Y') }}{% endif %}
+  </p>
+  {% endif %}
+  <div class="d-flex gap-2 flex-wrap mb-3">
+    <a href="{{ url_for('booking_invoice_pdf', booking_id=booking.id) }}" target="_blank" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-eye me-1"></i>Preview PDF
+    </a>
+    <a href="{{ url_for('booking_invoice_pdf', booking_id=booking.id) }}?download=1" class="btn btn-outline-primary btn-sm">
+      <i class="bi bi-download me-1"></i>Download PDF
+    </a>
+  </div>
+  <hr>
+  <p class="small fw-bold mb-2">Email Invoice</p>
+  <form method="post" action="{{ url_for('booking_invoice_send', booking_id=booking.id) }}">
+    <div class="row g-2 align-items-end">
+      <div class="col-md-4">
+        <input type="text" name="invoice_name" class="form-control form-control-sm" placeholder="Recipient name"
+          value="{{ booking.school.headteacher if booking.school and booking.school.headteacher else (booking.client_name or '') }}">
+      </div>
+      <div class="col-md-4">
+        <input type="text" name="invoice_email" class="form-control form-control-sm" placeholder="Email address"
+          value="{{ booking.school.main_email if booking.school else (booking.client_email or '') }}">
+      </div>
+      <div class="col-auto">
+        <button type="submit" class="btn btn-success btn-sm"><i class="bi bi-send me-1"></i>Send Invoice</button>
+      </div>
+    </div>
+  </form>
+</div>
+
 <!-- Delete -->
 {% if current_user.can_delete %}
 <div class="mt-4">

@@ -1,8 +1,9 @@
 import os
 import uuid
+import io
 from datetime import date, datetime, timedelta
 from werkzeug.utils import secure_filename
-from flask import Flask, render_template, redirect, url_for, request, flash, jsonify
+from flask import Flask, render_template, redirect, url_for, request, flash, jsonify, send_file
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from sqlalchemy import or_, func
 from models import db, User, School, Activity, Parent, ParentActivity, EmailTemplate, EmailLog, Attachment, Message, Booking
@@ -1105,6 +1106,249 @@ def booking_delete(booking_id):
     db.session.commit()
     flash('Booking deleted.', 'success')
     return redirect(url_for('bookings'))
+
+
+# ── Invoices ──────────────────────────────────────────────────────────────────
+
+def generate_invoice_number(booking_id):
+    return f'INV-{datetime.utcnow().year}-{booking_id:04d}'
+
+def build_invoice_pdf(booking):
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib import colors
+    from reportlab.lib.units import mm
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, HRFlowable
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.enums import TA_RIGHT, TA_CENTER
+
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=A4,
+                            topMargin=15*mm, bottomMargin=20*mm,
+                            leftMargin=20*mm, rightMargin=20*mm)
+    styles = getSampleStyleSheet()
+    W = A4[0] - 40*mm
+
+    brand_green = colors.HexColor('#198754')
+    light_grey  = colors.HexColor('#f8f9fa')
+    mid_grey    = colors.HexColor('#6c757d')
+
+    h1 = ParagraphStyle('h1', fontSize=22, fontName='Helvetica-Bold', textColor=brand_green, spaceAfter=2)
+    h2 = ParagraphStyle('h2', fontSize=11, fontName='Helvetica-Bold', spaceAfter=4)
+    normal = ParagraphStyle('normal', fontSize=9, fontName='Helvetica', leading=13)
+    small  = ParagraphStyle('small', fontSize=8, fontName='Helvetica', textColor=mid_grey, leading=12)
+    right  = ParagraphStyle('right', fontSize=9, fontName='Helvetica', alignment=TA_RIGHT)
+    bold_right = ParagraphStyle('bold_right', fontSize=11, fontName='Helvetica-Bold', alignment=TA_RIGHT)
+
+    story = []
+
+    # Header: company left, INVOICE right
+    header_data = [
+        [Paragraph('<b>Inventors League Limited</b>', h2),
+         Paragraph('INVOICE', ParagraphStyle('inv', fontSize=28, fontName='Helvetica-Bold',
+                                              textColor=brand_green, alignment=TA_RIGHT))],
+        [Paragraph('hello@inventorsleague.co.uk', small),
+         Paragraph(f'Invoice No: <b>{booking.invoice_number}</b>', right)],
+        [Paragraph('inventorsleague.co.uk', small),
+         Paragraph(f'Date: <b>{datetime.utcnow().strftime("%d %B %Y")}</b>', right)],
+        [Paragraph('', small),
+         Paragraph(f'Due: <b>{datetime.utcnow().strftime("%d %B %Y")}</b>', right)],
+    ]
+    header_table = Table(header_data, colWidths=[W*0.55, W*0.45])
+    header_table.setStyle(TableStyle([
+        ('VALIGN', (0,0), (-1,-1), 'TOP'),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 2),
+    ]))
+    story.append(header_table)
+    story.append(Spacer(1, 8*mm))
+    story.append(HRFlowable(width=W, thickness=2, color=brand_green))
+    story.append(Spacer(1, 6*mm))
+
+    # Bill to
+    bill_name = booking.school.name if booking.school else (booking.client_name or 'Customer')
+    bill_email = (booking.school.main_email if booking.school else booking.client_email) or ''
+    story.append(Paragraph('BILL TO', ParagraphStyle('label', fontSize=8, fontName='Helvetica-Bold',
+                                                      textColor=mid_grey, spaceAfter=2)))
+    story.append(Paragraph(f'<b>{bill_name}</b>', normal))
+    if bill_email:
+        story.append(Paragraph(bill_email, small))
+    story.append(Spacer(1, 6*mm))
+
+    # Line items table
+    if booking.booking_type == 'After School Club':
+        desc = (f'{booking.booking_type} — {booking.title}<br/>'
+                f'{booking.num_children or 0} children × {booking.num_weeks or 0} weeks')
+        unit_price = booking.price_per_child or 0
+        qty = (booking.num_children or 0) * (booking.num_weeks or 0)
+    elif booking.flat_fee:
+        desc = f'{booking.booking_type} — {booking.title}'
+        unit_price = booking.flat_fee
+        qty = 1
+    else:
+        desc = f'{booking.booking_type} — {booking.title}'
+        unit_price = booking.price_per_child or 0
+        qty = booking.num_children or 1
+
+    if booking.event_date:
+        desc += f'<br/>Date: {booking.event_date.strftime("%d %B %Y")}'
+
+    total = booking.total_revenue
+
+    items_data = [
+        [Paragraph('<b>Description</b>', normal), Paragraph('<b>Qty</b>', right),
+         Paragraph('<b>Unit Price</b>', right), Paragraph('<b>Amount</b>', right)],
+        [Paragraph(desc, normal), Paragraph(str(qty), right),
+         Paragraph(f'£{unit_price:,.2f}', right), Paragraph(f'£{total:,.2f}', right)],
+    ]
+    col_widths = [W*0.55, W*0.1, W*0.17, W*0.18]
+    items_table = Table(items_data, colWidths=col_widths)
+    items_table.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,0), brand_green),
+        ('TEXTCOLOR',  (0,0), (-1,0), colors.white),
+        ('ROWBACKGROUNDS', (0,1), (-1,-1), [light_grey, colors.white]),
+        ('GRID', (0,0), (-1,-1), 0.25, colors.HexColor('#dee2e6')),
+        ('VALIGN', (0,0), (-1,-1), 'TOP'),
+        ('TOPPADDING', (0,0), (-1,-1), 5),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 5),
+        ('LEFTPADDING', (0,0), (-1,-1), 6),
+        ('RIGHTPADDING', (0,0), (-1,-1), 6),
+    ]))
+    story.append(items_table)
+    story.append(Spacer(1, 4*mm))
+
+    # Totals block (right-aligned)
+    totals_data = [
+        ['', 'Subtotal', f'£{total:,.2f}'],
+        ['', 'VAT (0%)', '£0.00'],
+        ['', Paragraph('<b>TOTAL DUE</b>', bold_right), Paragraph(f'<b>£{total:,.2f}</b>', bold_right)],
+    ]
+    totals_table = Table(totals_data, colWidths=[W*0.55, W*0.25, W*0.20])
+    totals_table.setStyle(TableStyle([
+        ('ALIGN', (1,0), (-1,-1), 'RIGHT'),
+        ('LINEABOVE', (1,2), (-1,2), 1, brand_green),
+        ('TOPPADDING', (0,0), (-1,-1), 3),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 3),
+    ]))
+    story.append(totals_table)
+    story.append(Spacer(1, 10*mm))
+
+    # Payment details
+    story.append(HRFlowable(width=W, thickness=0.5, color=colors.HexColor('#dee2e6')))
+    story.append(Spacer(1, 4*mm))
+    story.append(Paragraph('<b>Payment Details</b>', h2))
+    story.append(Paragraph('Please make payment by BACS transfer to:', normal))
+    story.append(Spacer(1, 2*mm))
+    bank_data = [
+        ['Account Name:', 'Inventors League Limited'],
+        ['Sort Code:', os.environ.get('BANK_SORT_CODE', '00-00-00')],
+        ['Account Number:', os.environ.get('BANK_ACCOUNT_NUMBER', '00000000')],
+        ['Reference:', booking.invoice_number],
+    ]
+    bank_table = Table(bank_data, colWidths=[W*0.25, W*0.75])
+    bank_table.setStyle(TableStyle([
+        ('FONTNAME', (0,0), (0,-1), 'Helvetica-Bold'),
+        ('FONTSIZE', (0,0), (-1,-1), 9),
+        ('TOPPADDING', (0,0), (-1,-1), 2),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 2),
+    ]))
+    story.append(bank_table)
+
+    if booking.notes:
+        story.append(Spacer(1, 6*mm))
+        story.append(Paragraph('<b>Notes</b>', h2))
+        story.append(Paragraph(booking.notes, normal))
+
+    story.append(Spacer(1, 8*mm))
+    story.append(HRFlowable(width=W, thickness=0.5, color=colors.HexColor('#dee2e6')))
+    story.append(Spacer(1, 2*mm))
+    story.append(Paragraph('Thank you for choosing Inventors League!',
+                            ParagraphStyle('footer', fontSize=8, textColor=mid_grey, alignment=TA_CENTER)))
+
+    doc.build(story)
+    buf.seek(0)
+    return buf
+
+
+@app.route('/bookings/<int:booking_id>/invoice/pdf')
+@login_required
+def booking_invoice_pdf(booking_id):
+    b = Booking.query.get_or_404(booking_id)
+    if not b.invoice_number:
+        b.invoice_number = generate_invoice_number(b.id)
+        if b.status == 'Confirmed':
+            b.status = 'Invoiced'
+            b.invoice_sent_at = datetime.utcnow()
+        db.session.commit()
+    pdf = build_invoice_pdf(b)
+    filename = f'Invoice-{b.invoice_number}.pdf'
+    return send_file(pdf, mimetype='application/pdf',
+                     as_attachment=request.args.get('download') == '1',
+                     download_name=filename)
+
+
+@app.route('/bookings/<int:booking_id>/invoice/send', methods=['POST'])
+@login_required
+def booking_invoice_send(booking_id):
+    b = Booking.query.get_or_404(booking_id)
+    to_email = request.form.get('invoice_email', '').strip()
+    to_name = request.form.get('invoice_name', '').strip()
+
+    if not to_email:
+        flash('Please enter an email address to send the invoice to.', 'danger')
+        return redirect(url_for('booking_detail', booking_id=b.id))
+
+    if not b.invoice_number:
+        b.invoice_number = generate_invoice_number(b.id)
+
+    pdf = build_invoice_pdf(b)
+    pdf_bytes = pdf.read()
+
+    # Send via Brevo SMTP with attachment
+    import smtplib
+    from email.mime.multipart import MIMEMultipart
+    from email.mime.text import MIMEText
+    from email.mime.base import MIMEBase
+    from email import encoders
+
+    smtp_user = os.environ.get('BREVO_SMTP_USER')
+    smtp_pass = os.environ.get('BREVO_SMTP_PASS')
+    sender_email = os.environ.get('BREVO_SENDER_EMAIL', 'hello@inventorsleague.co.uk')
+    sender_name  = os.environ.get('BREVO_SENDER_NAME', 'Inventors League')
+
+    subject = f'Invoice {b.invoice_number} — {b.title}'
+    body_html = f"""
+    <p>Dear {to_name or 'there'},</p>
+    <p>Please find attached your invoice <strong>{b.invoice_number}</strong> for <strong>{b.title}</strong>.</p>
+    <p>Total due: <strong>£{b.total_revenue:,.2f}</strong></p>
+    <p>Please make payment by BACS using the details on the invoice, quoting reference <strong>{b.invoice_number}</strong>.</p>
+    <p>If you have any questions, please don't hesitate to get in touch.</p>
+    <p>Many thanks,<br>The Inventors League Team</p>
+    """
+
+    msg = MIMEMultipart()
+    msg['Subject'] = subject
+    msg['From'] = f'{sender_name} <{sender_email}>'
+    msg['To'] = f'{to_name} <{to_email}>' if to_name else to_email
+    msg.attach(MIMEText(body_html, 'html'))
+
+    attachment = MIMEBase('application', 'pdf')
+    attachment.set_payload(pdf_bytes)
+    encoders.encode_base64(attachment)
+    attachment.add_header('Content-Disposition', f'attachment; filename="Invoice-{b.invoice_number}.pdf"')
+    msg.attach(attachment)
+
+    try:
+        with smtplib.SMTP('smtp-relay.brevo.com', 587) as server:
+            server.starttls()
+            server.login(smtp_user, smtp_pass)
+            server.sendmail(sender_email, to_email, msg.as_string())
+        b.status = 'Invoiced'
+        b.invoice_sent_at = datetime.utcnow()
+        db.session.commit()
+        flash(f'Invoice {b.invoice_number} sent to {to_email}.', 'success')
+    except Exception as e:
+        flash(f'Failed to send invoice: {e}', 'danger')
+
+    return redirect(url_for('booking_detail', booking_id=b.id))
 
 
 # ── Data Import ───────────────────────────────────────────────────────────────
