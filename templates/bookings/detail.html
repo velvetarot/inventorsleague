@@ -124,6 +124,78 @@
   </div>
 </div>
 
+<!-- Payments panel -->
+<div class="card p-4 mt-4">
+  <h6 class="fw-bold mb-3"><i class="bi bi-cash-stack me-1"></i>Payments</h6>
+
+  {% set all_payments = booking.payments.all() %}
+  {% if all_payments %}
+  <table class="table table-sm mb-3">
+    <thead><tr><th>Date</th><th>Method</th><th>Reference</th><th>Amount</th><th></th></tr></thead>
+    <tbody>
+    {% for p in all_payments %}
+    <tr>
+      <td class="small">{{ p.paid_at.strftime('%d %b %Y') }}</td>
+      <td class="small">{{ p.method }}</td>
+      <td class="small text-muted">{{ p.reference or '—' }}</td>
+      <td class="fw-semibold text-success">£{{ '{:,.2f}'.format(p.amount) }}</td>
+      <td>
+        {% if current_user.can_delete %}
+        <form method="post" action="{{ url_for('payment_delete', payment_id=p.id) }}" onsubmit="return confirm('Remove this payment?')">
+          <button type="submit" class="btn btn-sm btn-link text-danger p-0"><i class="bi bi-x-lg"></i></button>
+        </form>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+    <tfoot>
+      <tr class="fw-bold">
+        <td colspan="3">Total Paid</td>
+        <td class="text-success">£{{ '{:,.2f}'.format(booking.total_paid) }}</td>
+        <td></td>
+      </tr>
+      {% if booking.outstanding > 0 %}
+      <tr class="text-danger">
+        <td colspan="3">Outstanding</td>
+        <td>£{{ '{:,.2f}'.format(booking.outstanding) }}</td>
+        <td></td>
+      </tr>
+      {% endif %}
+    </tfoot>
+  </table>
+  {% endif %}
+
+  <!-- Add payment form -->
+  <p class="small fw-bold mb-2">Record a Payment</p>
+  <form method="post" action="{{ url_for('payment_add', booking_id=booking.id) }}">
+    <div class="row g-2 align-items-end">
+      <div class="col-md-2">
+        <label class="form-label small">Amount (£)</label>
+        <input type="number" name="amount" class="form-control form-control-sm" step="0.01" min="0.01"
+          placeholder="{{ '{:.2f}'.format(booking.outstanding) }}">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small">Method</label>
+        <select name="method" class="form-select form-select-sm">
+          <option>BACS</option><option>Card</option><option>Cash</option><option>Cheque</option><option>Other</option>
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small">Date</label>
+        <input type="date" name="paid_at" class="form-control form-control-sm" value="{{ today.strftime('%Y-%m-%d') if today is defined else '' }}">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label small">Reference</label>
+        <input type="text" name="reference" class="form-control form-control-sm" placeholder="e.g. {{ booking.invoice_number or 'INV-2025-0001' }}">
+      </div>
+      <div class="col-auto">
+        <button type="submit" class="btn btn-success btn-sm"><i class="bi bi-plus-lg me-1"></i>Record Payment</button>
+      </div>
+    </div>
+  </form>
+</div>
+
 <!-- Invoice panel -->
 <div class="card p-4 mt-4">
   <h6 class="fw-bold mb-3"><i class="bi bi-receipt me-1"></i>Invoice</h6>

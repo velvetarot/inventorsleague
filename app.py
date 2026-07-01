@@ -6,7 +6,7 @@ from werkzeug.utils import secure_filename
 from flask import Flask, render_template, redirect, url_for, request, flash, jsonify, send_file
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from sqlalchemy import or_, func
-from models import db, User, School, Activity, Parent, ParentActivity, EmailTemplate, EmailLog, Attachment, Message, Booking
+from models import db, User, School, Activity, Parent, ParentActivity, EmailTemplate, EmailLog, Attachment, Message, Booking, Payment
 from brevo import send_email
 from dotenv import load_dotenv
 
@@ -1349,6 +1349,113 @@ def booking_invoice_send(booking_id):
         flash(f'Failed to send invoice: {e}', 'danger')
 
     return redirect(url_for('booking_detail', booking_id=b.id))
+
+
+# ── Payments ──────────────────────────────────────────────────────────────────
+
+PAYMENT_METHODS = ['BACS', 'Card', 'Cash', 'Cheque', 'Other']
+
+@app.route('/bookings/<int:booking_id>/payments/add', methods=['POST'])
+@login_required
+def payment_add(booking_id):
+    b = Booking.query.get_or_404(booking_id)
+    amount = request.form.get('amount', type=float)
+    if not amount or amount <= 0:
+        flash('Please enter a valid amount.', 'danger')
+        return redirect(url_for('booking_detail', booking_id=b.id))
+
+    paid_at_str = request.form.get('paid_at')
+    paid_at = datetime.strptime(paid_at_str, '%Y-%m-%d') if paid_at_str else datetime.utcnow()
+
+    p = Payment(
+        booking_id=b.id,
+        user_id=current_user.id,
+        amount=amount,
+        method=request.form.get('method', 'BACS'),
+        reference=request.form.get('reference', '').strip(),
+        notes=request.form.get('notes', '').strip(),
+        paid_at=paid_at,
+    )
+    db.session.add(p)
+
+    # Update booking amount_paid and status
+    b.amount_paid = b.total_paid + amount
+    if b.amount_paid >= b.total_revenue:
+        b.status = 'Paid'
+        b.paid_at = datetime.utcnow()
+    db.session.commit()
+    flash(f'Payment of £{amount:,.2f} recorded.', 'success')
+    return redirect(url_for('booking_detail', booking_id=b.id))
+
+
+@app.route('/payments/<int:payment_id>/delete', methods=['POST'])
+@login_required
+def payment_delete(payment_id):
+    p = Payment.query.get_or_404(payment_id)
+    booking_id = p.booking_id
+    b = p.booking
+    db.session.delete(p)
+    db.session.flush()
+    b.amount_paid = b.total_paid
+    if b.amount_paid < b.total_revenue and b.status == 'Paid':
+        b.status = 'Invoiced'
+        b.paid_at = None
+    db.session.commit()
+    flash('Payment removed.', 'success')
+    return redirect(url_for('booking_detail', booking_id=booking_id))
+
+
+# ── Finance Dashboard ──────────────────────────────────────────────────────────
+
+@app.route('/finance')
+@login_required
+def finance_dashboard():
+    from sqlalchemy import extract
+    now = datetime.utcnow()
+
+    all_bookings = Booking.query.filter(Booking.status != 'Cancelled').all()
+
+    # This month
+    month_bookings = [b for b in all_bookings
+                      if b.event_date and b.event_date.month == now.month and b.event_date.year == now.year]
+    # This year
+    year_bookings  = [b for b in all_bookings
+                      if b.event_date and b.event_date.year == now.year]
+
+    def totals(blist):
+        revenue = sum(b.total_revenue for b in blist)
+        paid    = sum(b.total_paid for b in blist)
+        return revenue, paid, revenue - paid
+
+    month_rev, month_paid, month_out = totals(month_bookings)
+    year_rev,  year_paid,  year_out  = totals(year_bookings)
+    all_rev,   all_paid,   all_out   = totals(all_bookings)
+
+    overdue = [b for b in all_bookings if b.is_overdue]
+
+    # Revenue by type
+    by_type = {}
+    for b in year_bookings:
+        by_type[b.booking_type] = by_type.get(b.booking_type, 0) + b.total_revenue
+
+    # Recent payments
+    recent_payments = Payment.query.order_by(Payment.paid_at.desc()).limit(10).all()
+
+    # Outstanding invoices (invoiced but not fully paid)
+    outstanding_bookings = [b for b in all_bookings
+                            if b.status in ('Invoiced', 'Confirmed') and b.outstanding > 0]
+    outstanding_bookings.sort(key=lambda b: b.event_date or date.today())
+
+    return render_template('finance/dashboard.html',
+        month_rev=month_rev, month_paid=month_paid, month_out=month_out,
+        year_rev=year_rev, year_paid=year_paid, year_out=year_out,
+        all_rev=all_rev, all_paid=all_paid, all_out=all_out,
+        overdue=overdue,
+        by_type=by_type,
+        recent_payments=recent_payments,
+        outstanding_bookings=outstanding_bookings,
+        now=now,
+    )
 
 
 # ── Data Import ───────────────────────────────────────────────────────────────

@@ -1,0 +1,150 @@
+{% extends 'base.html' %}
+{% block title %}Finance{% endblock %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h4 class="fw-bold mb-0">Finance Dashboard</h4>
+  <a href="{{ url_for('bookings') }}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-calendar-check me-1"></i>All Bookings</a>
+</div>
+
+<!-- Overdue alert -->
+{% if overdue %}
+<div class="alert alert-danger d-flex align-items-center mb-4">
+  <i class="bi bi-exclamation-triangle-fill me-2 fs-5"></i>
+  <div>
+    <strong>{{ overdue|length }} overdue invoice{{ 's' if overdue|length > 1 }}!</strong>
+    {% for b in overdue %}
+    <a href="{{ url_for('booking_detail', booking_id=b.id) }}" class="ms-2 alert-link">{{ b.invoice_number }} — {{ b.title }}</a>{% if not loop.last %},{% endif %}
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<!-- Summary cards: This Month -->
+<h6 class="text-muted fw-semibold mb-2 text-uppercase" style="font-size:.75rem;">This Month — {{ now.strftime('%B %Y') }}</h6>
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-4">
+    <div class="card stat-card p-3" style="border-color:#198754">
+      <div class="text-muted small">Revenue</div>
+      <div class="fs-3 fw-bold">£{{ '{:,.0f}'.format(month_rev) }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-4">
+    <div class="card stat-card p-3" style="border-color:#0d6efd">
+      <div class="text-muted small">Paid</div>
+      <div class="fs-3 fw-bold">£{{ '{:,.0f}'.format(month_paid) }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-4">
+    <div class="card stat-card p-3" style="border-color:#ffc107">
+      <div class="text-muted small">Outstanding</div>
+      <div class="fs-3 fw-bold">£{{ '{:,.0f}'.format(month_out) }}</div>
+    </div>
+  </div>
+</div>
+
+<!-- This Year -->
+<h6 class="text-muted fw-semibold mb-2 text-uppercase" style="font-size:.75rem;">This Year — {{ now.year }}</h6>
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-4">
+    <div class="card stat-card p-3" style="border-color:#198754">
+      <div class="text-muted small">Revenue</div>
+      <div class="fs-3 fw-bold">£{{ '{:,.0f}'.format(year_rev) }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-4">
+    <div class="card stat-card p-3" style="border-color:#0d6efd">
+      <div class="text-muted small">Paid</div>
+      <div class="fs-3 fw-bold">£{{ '{:,.0f}'.format(year_paid) }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-4">
+    <div class="card stat-card p-3" style="border-color:#ffc107">
+      <div class="text-muted small">Outstanding</div>
+      <div class="fs-3 fw-bold">£{{ '{:,.0f}'.format(year_out) }}</div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4">
+
+  <!-- Outstanding invoices -->
+  <div class="col-lg-7">
+    <div class="card">
+      <div class="card-header fw-bold py-2"><i class="bi bi-hourglass-split me-1"></i> Outstanding Invoices</div>
+      {% if outstanding_bookings %}
+      <div class="table-responsive">
+        <table class="table table-sm table-hover mb-0 align-middle">
+          <thead><tr><th>Booking</th><th>Invoice</th><th>Due</th><th>Outstanding</th><th></th></tr></thead>
+          <tbody>
+          {% for b in outstanding_bookings %}
+          <tr {% if b.is_overdue %}class="table-danger"{% endif %}>
+            <td>
+              <a href="{{ url_for('booking_detail', booking_id=b.id) }}" class="fw-semibold text-decoration-none small">{{ b.title }}</a>
+              {% if b.is_overdue %}<span class="badge bg-danger ms-1">Overdue</span>{% endif %}
+            </td>
+            <td class="small text-muted">{{ b.invoice_number or '—' }}</td>
+            <td class="small text-muted">{{ b.event_date.strftime('%d %b %Y') if b.event_date else '—' }}</td>
+            <td class="fw-semibold text-danger">£{{ '{:,.2f}'.format(b.outstanding) }}</td>
+            <td><a href="{{ url_for('booking_detail', booking_id=b.id) }}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-right"></i></a></td>
+          </tr>
+          {% endfor %}
+          </tbody>
+          <tfoot class="fw-bold">
+            <tr>
+              <td colspan="3">Total Outstanding</td>
+              <td class="text-danger">£{{ '{:,.2f}'.format(outstanding_bookings | sum(attribute='outstanding')) }}</td>
+              <td></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+      {% else %}
+      <div class="card-body text-muted small">All invoices paid — great work!</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Revenue by type -->
+  <div class="col-lg-5">
+    <div class="card p-3 mb-4">
+      <div class="fw-bold mb-3"><i class="bi bi-pie-chart me-1"></i> Revenue by Type ({{ now.year }})</div>
+      {% if by_type %}
+      <ul class="list-group list-group-flush">
+        {% for btype, rev in by_type.items() | sort(attribute='1', reverse=True) %}
+        <li class="list-group-item px-0 d-flex justify-content-between align-items-center">
+          <span class="small">{{ btype }}</span>
+          <span class="fw-semibold">£{{ '{:,.0f}'.format(rev) }}</span>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p class="text-muted small mb-0">No bookings this year yet.</p>
+      {% endif %}
+    </div>
+
+    <!-- Recent payments -->
+    <div class="card p-3">
+      <div class="fw-bold mb-3"><i class="bi bi-clock-history me-1"></i> Recent Payments</div>
+      {% if recent_payments %}
+      <ul class="list-group list-group-flush">
+        {% for p in recent_payments %}
+        <li class="list-group-item px-0">
+          <div class="d-flex justify-content-between align-items-start">
+            <div>
+              <a href="{{ url_for('booking_detail', booking_id=p.booking_id) }}" class="small fw-semibold text-decoration-none">{{ p.booking.title }}</a>
+              <div class="text-muted" style="font-size:.75rem;">{{ p.method }}{% if p.reference %} · {{ p.reference }}{% endif %} · {{ p.paid_at.strftime('%d %b %Y') }}</div>
+            </div>
+            <span class="fw-semibold text-success">£{{ '{:,.2f}'.format(p.amount) }}</span>
+          </div>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p class="text-muted small mb-0">No payments recorded yet.</p>
+      {% endif %}
+    </div>
+  </div>
+
+</div>
+{% endblock %}

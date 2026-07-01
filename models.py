@@ -259,6 +259,8 @@ class Booking(db.Model):
 
     school = db.relationship('School', backref='bookings')
     user = db.relationship('User', backref='bookings')
+    payments = db.relationship('Payment', backref='booking', lazy='dynamic',
+                               order_by='Payment.paid_at.desc()')
 
     @property
     def total_revenue(self):
@@ -269,8 +271,34 @@ class Booking(db.Model):
         return (self.num_children or 0) * (self.price_per_child or 0)
 
     @property
+    def total_paid(self):
+        return sum(p.amount for p in self.payments)
+
+    @property
     def outstanding(self):
-        return (self.total_revenue or 0) - (self.amount_paid or 0)
+        return max(0, (self.total_revenue or 0) - self.total_paid)
+
+    @property
+    def is_overdue(self):
+        if self.status in ('Paid', 'Cancelled'):
+            return False
+        if self.status == 'Invoiced' and self.invoice_sent_at:
+            return (datetime.utcnow() - self.invoice_sent_at).days > 30
+        return False
+
+
+class Payment(db.Model):
+    __tablename__ = 'payments'
+    id = db.Column(db.Integer, primary_key=True)
+    booking_id = db.Column(db.Integer, db.ForeignKey('bookings.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
+    amount = db.Column(db.Float, nullable=False)
+    method = db.Column(db.String(30), default='BACS')  # BACS / Card / Cash / Cheque
+    reference = db.Column(db.String(100))
+    notes = db.Column(db.String(300))
+    paid_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    user = db.relationship('User', backref='payments')
 
 
 class Activity(db.Model):
