@@ -1,43 +1,38 @@
 import os
-import requests
-
-BREVO_API_URL = 'https://api.brevo.com/v3/smtp/email'
+import uuid
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 
 
 def send_email(to_email, to_name, subject, html_content, reply_to=None):
     """
-    Send a transactional email via Brevo.
+    Send a transactional email via Brevo SMTP (no IP whitelisting required).
     Returns (message_id, error_message).
-    message_id is None if sending failed.
     """
-    api_key = os.environ.get('BREVO_API_KEY')
+    smtp_user = os.environ.get('BREVO_SMTP_USER')
+    smtp_pass = os.environ.get('BREVO_SMTP_PASS')
     sender_email = os.environ.get('BREVO_SENDER_EMAIL', 'hello@inventorsleague.co.uk')
     sender_name = os.environ.get('BREVO_SENDER_NAME', 'Inventors League')
 
-    if not api_key:
-        return None, 'BREVO_API_KEY not configured'
+    if not smtp_user or not smtp_pass:
+        return None, 'BREVO_SMTP_USER / BREVO_SMTP_PASS not configured'
 
-    payload = {
-        'sender': {'name': sender_name, 'email': sender_email},
-        'to': [{'email': to_email, 'name': to_name or to_email}],
-        'subject': subject,
-        'htmlContent': html_content,
-    }
+    msg = MIMEMultipart('alternative')
+    msg['Subject'] = subject
+    msg['From'] = f'{sender_name} <{sender_email}>'
+    msg['To'] = f'{to_name} <{to_email}>' if to_name else to_email
     if reply_to:
-        payload['replyTo'] = {'email': reply_to}
+        msg['Reply-To'] = reply_to
 
-    headers = {
-        'accept': 'application/json',
-        'api-key': api_key,
-        'content-type': 'application/json',
-    }
+    msg.attach(MIMEText(html_content, 'html'))
 
     try:
-        r = requests.post(BREVO_API_URL, json=payload, headers=headers, timeout=10)
-        if r.status_code == 201:
-            message_id = r.json().get('messageId', '')
-            return message_id, None
-        else:
-            return None, f'Brevo error {r.status_code}: {r.text}'
+        with smtplib.SMTP('smtp-relay.brevo.com', 587) as server:
+            server.starttls()
+            server.login(smtp_user, smtp_pass)
+            server.sendmail(sender_email, to_email, msg.as_string())
+        message_id = f'<{uuid.uuid4()}@inventorsleague.co.uk>'
+        return message_id, None
     except Exception as e:
         return None, str(e)
