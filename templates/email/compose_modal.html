@@ -25,7 +25,7 @@
                     data-name="{{ school.headteacher }}"
                     data-email="{{ school.main_email or '' }}"
                     data-role="headteacher"
-                    data-salutation="Dear {{first_name}}">
+                    data-salutation="Dear {{ '{{first_name}}' }}">
                     <i class="bi bi-person-badge me-1"></i>
                     Headteacher<br>
                     <small class="text-muted">{{ school.headteacher }}</small>
@@ -38,7 +38,7 @@
                     data-name="{{ school.business_manager_name }}"
                     data-email="{{ school.business_manager_email or school.main_email or '' }}"
                     data-role="business_manager"
-                    data-salutation="Dear {{first_name}}">
+                    data-salutation="Dear {{ '{{first_name}}' }}">
                     <i class="bi bi-briefcase me-1"></i>
                     Business Manager<br>
                     <small class="text-muted">{{ school.business_manager_name }}</small>
@@ -51,7 +51,7 @@
                     data-name="{{ school.gatekeeper }}"
                     data-email="{{ school.main_email or '' }}"
                     data-role="gatekeeper"
-                    data-salutation="Dear {{first_name}}">
+                    data-salutation="Dear {{ '{{first_name}}' }}">
                     <i class="bi bi-shield me-1"></i>
                     Gatekeeper<br>
                     <small class="text-muted">{{ school.gatekeeper }}</small>
@@ -86,7 +86,7 @@
                     data-name="{{ parent.name }}"
                     data-email="{{ parent.email or '' }}"
                     data-role="parent"
-                    data-salutation="Dear {{first_name}}">
+                    data-salutation="Dear {{ '{{first_name}}' }}">
                     <i class="bi bi-person-heart me-1"></i>
                     {{ parent.name }}<br>
                     <small class="text-muted">{{ parent.email or 'no email on record' }}</small>
