@@ -180,6 +180,7 @@ def schools():
     phase = request.args.get('phase', '')
     tier = request.args.get('tier', '')
     club_status = request.args.get('club_status', '')
+    school_type = request.args.get('school_type', '')
     activity_filter = request.args.get('activity_filter', '')
     sort = request.args.get('sort', 'name')
 
@@ -200,6 +201,8 @@ def schools():
         query = query.filter(School.priority_tier == tier)
     if club_status:
         query = query.filter(School.after_school_club_status == club_status)
+    if school_type:
+        query = query.filter(School.school_type == school_type)
     if activity_filter == 'contacted':
         query = query.filter(School.last_contacted.isnot(None))
 
@@ -216,13 +219,15 @@ def schools():
     phases = [r[0] for r in db.session.query(School.phase).distinct() if r[0]]
     tiers = [r[0] for r in db.session.query(School.priority_tier).distinct() if r[0]]
     club_statuses = [r[0] for r in db.session.query(School.after_school_club_status).distinct() if r[0]]
+    school_types = [r[0] for r in db.session.query(School.school_type).distinct() if r[0]]
 
     return render_template('schools/index.html',
                            schools=schools_list, q=q, phase=phase,
                            tier=tier, club_status=club_status, sort=sort,
-                           activity_filter=activity_filter,
+                           school_type=school_type, activity_filter=activity_filter,
                            phases=sorted(phases), tiers=sorted(tiers),
-                           club_statuses=sorted(club_statuses))
+                           club_statuses=sorted(club_statuses),
+                           school_types=sorted(school_types))
 
 
 @app.route('/schools/<int:school_id>')

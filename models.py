@@ -69,6 +69,7 @@ class School(db.Model):
     headteacher = db.Column(db.String(200))
     account_type = db.Column(db.String(100))
     phase = db.Column(db.String(50))          # Primary / Secondary
+    school_type = db.Column(db.String(100))   # e.g. Community school, Other independent school
     pupils = db.Column(db.Integer)
     fsm_percent = db.Column(db.Float)
     affluence_score = db.Column(db.Float)

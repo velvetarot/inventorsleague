@@ -28,6 +28,12 @@
       </select>
     </div>
     <div class="col-auto">
+      <select name="school_type" class="form-select form-select-sm">
+        <option value="">All types</option>
+        {% for st in school_types %}<option value="{{ st }}" {% if st==school_type %}selected{% endif %}>{{ st }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="col-auto">
       <select name="club_status" class="form-select form-select-sm">
         <option value="">All club statuses</option>
         {% for s in club_statuses %}<option {% if s==club_status %}selected{% endif %}>{{ s }}</option>{% endfor %}
@@ -89,7 +95,7 @@
             <input type="checkbox" class="form-check-input" id="select-all" onchange="toggleAll(this)">
           </th>
           <th>School</th>
-          <th>Phase</th>
+          <th>Phase / Type</th>
           <th>Tier</th>
           <th>Pupils</th>
           <th>Term Rev</th>
@@ -109,7 +115,10 @@
           {% if s.won %}<span class="badge bg-success ms-1">Won</span>{% endif %}
           <div class="text-muted small">{{ s.city or '' }}{% if s.postcode %} {{ s.postcode }}{% endif %}</div>
         </td>
-        <td><span class="text-muted small">{{ s.phase or '—' }}</span></td>
+        <td>
+          <span class="text-muted small">{{ s.phase or '—' }}</span>
+          {% if s.school_type %}<div style="font-size:.7rem;" class="text-muted">{{ s.school_type }}</div>{% endif %}
+        </td>
         <td>
           {% set tier_labels = {'A': 'Call Now', 'B': 'Call This Week', 'C': 'Keep Warm', 'D': 'Low Priority', 'Z': 'Not Interested'} %}
           {% if s.priority_tier %}
