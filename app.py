@@ -176,6 +176,7 @@ def schools():
     phase = request.args.get('phase', '')
     tier = request.args.get('tier', '')
     club_status = request.args.get('club_status', '')
+    activity_filter = request.args.get('activity_filter', '')
     sort = request.args.get('sort', 'name')
 
     query = School.query
@@ -189,10 +190,14 @@ def schools():
         ))
     if phase:
         query = query.filter(School.phase == phase)
-    if tier:
+    if tier == 'I':
+        query = query.filter(School.priority_tier.is_(None))
+    elif tier:
         query = query.filter(School.priority_tier == tier)
     if club_status:
         query = query.filter(School.after_school_club_status == club_status)
+    if activity_filter == 'contacted':
+        query = query.filter(School.last_contacted.isnot(None))
 
     sort_map = {
         'name': School.name,
@@ -211,6 +216,7 @@ def schools():
     return render_template('schools/index.html',
                            schools=schools_list, q=q, phase=phase,
                            tier=tier, club_status=club_status, sort=sort,
+                           activity_filter=activity_filter,
                            phases=sorted(phases), tiers=sorted(tiers),
                            club_statuses=sorted(club_statuses))
 
@@ -258,6 +264,20 @@ def school_edit(school_id):
         flash('School updated.', 'success')
         return redirect(url_for('school_detail', school_id=school.id))
     return render_template('schools/edit.html', school=school)
+
+
+@app.route('/schools/bulk-tier', methods=['POST'])
+@login_required
+def schools_bulk_tier():
+    ids_raw = request.form.get('school_ids', '')
+    tier_raw = request.form.get('tier', '').strip()
+    tier = None if tier_raw in ('', 'clear') else tier_raw
+    ids = [int(i) for i in ids_raw.split(',') if i.strip().isdigit()]
+    if ids:
+        School.query.filter(School.id.in_(ids)).update({'priority_tier': tier}, synchronize_session=False)
+        db.session.commit()
+        flash(f'Updated tier for {len(ids)} school{"s" if len(ids) != 1 else ""}.', 'success')
+    return redirect(url_for('schools'))
 
 
 @app.route('/schools/new', methods=['GET', 'POST'])
