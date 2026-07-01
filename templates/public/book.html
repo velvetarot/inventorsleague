@@ -1,0 +1,60 @@
+{% extends 'public/base.html' %}
+{% block title %}Book an Activity{% endblock %}
+{% block content %}
+
+<h2 class="fw-bold mb-1">Activities & Clubs</h2>
+<p class="text-muted mb-4">Choose an activity below to view sessions and book your place.</p>
+
+{% if programmes %}
+<div class="row g-4">
+  {% for p in programmes %}
+  <div class="col-md-6 col-lg-4">
+    <div class="card h-100 p-4">
+      <div class="d-flex align-items-center gap-2 mb-2">
+        <span class="badge bg-success">{{ p.activity_type or 'Activity' }}</span>
+        {% if p.min_age_years and p.max_age_years %}
+        <span class="badge bg-light text-dark">{{ p.min_age_years }}–{{ p.max_age_years }} yrs</span>
+        {% endif %}
+      </div>
+      <h5 class="fw-bold mb-1">{{ p.name }}</h5>
+      {% if p.description %}
+      <p class="text-muted small mb-3">{{ p.description[:120] }}{% if p.description|length > 120 %}…{% endif %}</p>
+      {% endif %}
+      <ul class="list-unstyled small text-muted mb-3">
+        {% if p.location_name %}
+        <li><i class="bi bi-geo-alt me-2 text-success"></i>{{ p.location_name }}</li>
+        {% endif %}
+        {% if p.start_date %}
+        <li><i class="bi bi-calendar3 me-2 text-success"></i>{{ p.start_date.strftime('%d %b') }}{% if p.end_date %} – {{ p.end_date.strftime('%d %b %Y') }}{% endif %}</li>
+        {% endif %}
+        {% if p.start_time %}
+        <li><i class="bi bi-clock me-2 text-success"></i>{{ p.start_time }}–{{ p.end_time }}</li>
+        {% endif %}
+        {% if p.days_list %}
+        <li><i class="bi bi-calendar-week me-2 text-success"></i>{{ p.days_list | join(', ') }}</li>
+        {% endif %}
+      </ul>
+      <div class="d-flex justify-content-between align-items-center mt-auto">
+        <div>
+          {% if p.price_per_session %}
+          <span class="fs-5 fw-bold text-success">£{{ '{:.2f}'.format(p.price_per_session) }}</span>
+          <span class="text-muted small"> / session</span>
+          {% else %}
+          <span class="text-success fw-bold">Free</span>
+          {% endif %}
+        </div>
+        <a href="{{ url_for('public_activity', slug=p.slug) }}" class="btn btn-success">Book Now</a>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="text-center py-5 text-muted">
+  <i class="bi bi-calendar-x fs-1 d-block mb-3"></i>
+  <h5>No activities available right now</h5>
+  <p>Check back soon or contact us at hello@inventorsleague.co.uk</p>
+</div>
+{% endif %}
+
+{% endblock %}

@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Register — {{ programme.name }} — {{ session.date.strftime('%d %b %Y') }}</title>
+  <style>
+    body { font-family: Arial, sans-serif; font-size: 12px; margin: 20px; color: #000; }
+    h1 { font-size: 18px; margin-bottom: 4px; }
+    h2 { font-size: 14px; color: #555; margin-bottom: 2px; font-weight: normal; }
+    .meta { color: #555; margin-bottom: 16px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+    th { background: #198754; color: white; padding: 6px 8px; text-align: left; font-size: 11px; }
+    td { padding: 6px 8px; border-bottom: 1px solid #ddd; vertical-align: top; }
+    tr:nth-child(even) { background: #f9f9f9; }
+    .sig-col { width: 80px; }
+    .no-col { width: 30px; text-align: center; }
+    .footer { margin-top: 20px; font-size: 11px; color: #888; border-top: 1px solid #ddd; padding-top: 8px; }
+    @media print {
+      body { margin: 10px; }
+      .no-print { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="no-print" style="margin-bottom:16px;">
+  <button onclick="window.print()" style="background:#198754;color:white;border:none;padding:8px 16px;border-radius:4px;cursor:pointer;font-size:13px;">
+    🖨 Print Register
+  </button>
+  <button onclick="window.close()" style="margin-left:8px;padding:8px 16px;border-radius:4px;cursor:pointer;font-size:13px;">Close</button>
+</div>
+
+<h1>{{ programme.name }}</h1>
+<h2>Attendance Register</h2>
+<div class="meta">
+  <strong>Date:</strong> {{ session.date.strftime('%A, %d %B %Y') }} &nbsp;|&nbsp;
+  <strong>Time:</strong> {{ session.start_time }}–{{ session.end_time }} &nbsp;|&nbsp;
+  {% if programme.location_name %}<strong>Location:</strong> {{ programme.location_name }} &nbsp;|&nbsp;{% endif %}
+  <strong>Capacity:</strong> {{ session.capacity }} &nbsp;|&nbsp;
+  <strong>Enrolled:</strong> {{ enrolments | length }}
+</div>
+
+{% if enrolments %}
+<table>
+  <thead>
+    <tr>
+      <th class="no-col">#</th>
+      <th>Child's Name</th>
+      <th>Age / DOB</th>
+      <th>Parent / Guardian</th>
+      <th>Parent Phone</th>
+      <th>Emergency Contact</th>
+      <th>Emergency Phone</th>
+      <th>Medical Notes</th>
+      <th class="sig-col">Signature</th>
+    </tr>
+  </thead>
+  <tbody>
+  {% for e in enrolments %}
+  <tr>
+    <td class="no-col" style="text-align:center;">{{ loop.index }}</td>
+    <td><strong>{{ e.child_name }}</strong></td>
+    <td>
+      {% if e.child_dob %}
+      {{ e.child_dob.strftime('%d/%m/%Y') }}<br>
+      <span style="color:#555;">
+        {% set age_days = (session.date - e.child_dob).days %}
+        {% set age_years = (age_days // 365) %}
+        Age {{ age_years }}
+      </span>
+      {% else %}—{% endif %}
+    </td>
+    <td>{{ e.parent_name }}<br><span style="color:#555;font-size:11px;">{{ e.parent_email }}</span></td>
+    <td>{{ e.parent_phone or '—' }}</td>
+    <td>{{ e.emergency_name or '—' }}</td>
+    <td>{{ e.emergency_phone or '—' }}</td>
+    <td style="color:{% if e.medical_notes %}#c00{% else %}#999{% endif %};">
+      {{ e.medical_notes or 'None' }}
+    </td>
+    <td class="sig-col">&nbsp;</td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p style="color:#888;">No enrolments for this session.</p>
+{% endif %}
+
+<div class="footer">
+  Printed: {{ now.strftime('%d %b %Y %H:%M') if now is defined else '' }} &nbsp;|&nbsp;
+  Inventors League Limited &nbsp;|&nbsp; hello@inventorsleague.co.uk
+</div>
+
+<script>
+  const now = new Date();
+  document.querySelector('.footer').innerHTML +=
+    ' &nbsp;|&nbsp; Generated: ' + now.toLocaleDateString('en-GB') + ' ' + now.toLocaleTimeString('en-GB', {hour:'2-digit',minute:'2-digit'});
+</script>
+</body>
+</html>

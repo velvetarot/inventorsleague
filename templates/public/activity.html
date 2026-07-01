@@ -1,0 +1,311 @@
+{% extends 'public/base.html' %}
+{% block title %}{{ programme.name }}{% endblock %}
+{% block content %}
+
+<a href="{{ url_for('public_book') }}" class="text-muted small text-decoration-none"><i class="bi bi-arrow-left me-1"></i>All activities</a>
+
+<div class="row g-4 mt-1">
+
+  <!-- Left: session picker + form -->
+  <div class="col-lg-8">
+
+    <div class="card p-4 mb-4">
+      <h2 class="fw-bold mb-1">{{ programme.name }}</h2>
+      <div class="d-flex flex-wrap gap-2 mb-3">
+        {% if programme.activity_type %}<span class="badge bg-success">{{ programme.activity_type }}</span>{% endif %}
+        {% if programme.min_age_years and programme.max_age_years %}
+        <span class="badge bg-light text-dark">Ages {{ programme.min_age_years }}–{{ programme.max_age_years }}</span>
+        {% endif %}
+        {% if programme.start_time %}
+        <span class="badge bg-light text-dark"><i class="bi bi-clock me-1"></i>{{ programme.start_time }}–{{ programme.end_time }}</span>
+        {% endif %}
+      </div>
+      {% if programme.description %}
+      <p class="text-muted">{{ programme.description }}</p>
+      {% endif %}
+      {% if programme.location_name %}
+      <p class="mb-0"><i class="bi bi-geo-alt text-success me-1"></i><strong>{{ programme.location_name }}</strong>{% if programme.location_address %} — {{ programme.location_address }}{% endif %}</p>
+      {% endif %}
+    </div>
+
+    <form method="post" action="{{ url_for('public_enrol', slug=programme.slug) }}" id="booking-form">
+
+      <!-- Step 1: Pick sessions -->
+      <div class="card p-4 mb-4">
+        <h5 class="fw-bold mb-3"><span class="badge bg-success me-2">1</span>Choose your sessions</h5>
+        {% if sessions %}
+        <div class="mb-2">
+          <button type="button" class="btn btn-sm btn-outline-secondary me-2" onclick="selectAll()">Select all</button>
+          <button type="button" class="btn btn-sm btn-outline-secondary" onclick="selectNone()">Clear</button>
+        </div>
+        {% set current_week = namespace(val=None) %}
+        {% for s in sessions %}
+          {% set week = s.date.strftime('%d %b') %}
+          {% if s.date.weekday() == 0 or loop.first %}
+          {% if not loop.first %}</div>{% endif %}
+          <div class="mb-3">
+          <div class="text-muted small fw-semibold mb-2">Week of {{ s.date.strftime('%d %B %Y') }}</div>
+          {% endif %}
+          <label class="d-block mb-2 {% if s.is_full %}session-card full{% else %}session-card{% endif %} p-3" id="card-{{ s.id }}">
+            <input type="checkbox" name="sessions" value="{{ s.id }}"
+              class="session-cb me-2" {% if s.is_full %}disabled{% endif %}
+              onchange="onSessionToggle(this, {{ s.id }})">
+            <strong>{{ s.date.strftime('%A') }}</strong>
+            {{ s.date.strftime('%d %B %Y') }}
+            <span class="text-muted small ms-2">{{ s.start_time }}–{{ s.end_time }}</span>
+            {% if s.is_full %}
+            <span class="badge bg-danger ms-2">Full</span>
+            {% else %}
+            <span class="text-muted small ms-2">({{ s.spots_available }} place{{ 's' if s.spots_available != 1 }} left)</span>
+            {% endif %}
+          </label>
+          {% if loop.last %}</div>{% endif %}
+        {% endfor %}
+        {% else %}
+        <p class="text-muted">No upcoming sessions available.</p>
+        {% endif %}
+      </div>
+
+      <!-- Step 2: Child details -->
+      <div class="card p-4 mb-4" id="details-section" style="display:none">
+        <h5 class="fw-bold mb-3"><span class="badge bg-success me-2">2</span>Child's details</h5>
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label">Child's full name <span class="text-danger">*</span></label>
+            <input type="text" name="child_name" class="form-control" required>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Date of birth</label>
+            <input type="date" name="child_dob" class="form-control">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Medical notes / allergies</label>
+            <textarea name="medical_notes" class="form-control" rows="2" placeholder="None if not applicable"></textarea>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Emergency contact name</label>
+            <input type="text" name="emergency_name" class="form-control">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Emergency contact phone</label>
+            <input type="text" name="emergency_phone" class="form-control">
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 3: Parent details -->
+      <div class="card p-4 mb-4" id="parent-section" style="display:none">
+        <h5 class="fw-bold mb-3"><span class="badge bg-success me-2">3</span>Your details</h5>
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label">Your full name <span class="text-danger">*</span></label>
+            <input type="text" name="parent_name" class="form-control" required>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Email address <span class="text-danger">*</span></label>
+            <input type="email" name="parent_email" class="form-control" required>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Phone number</label>
+            <input type="tel" name="parent_phone" class="form-control">
+          </div>
+        </div>
+        <div class="mt-3">
+          <div class="form-check mb-2">
+            <input class="form-check-input" type="checkbox" name="photo_consent" id="photo_consent">
+            <label class="form-check-label small" for="photo_consent">
+              I give permission for photos/videos of my child to be used in Inventors League marketing materials.
+            </label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="marketing_consent" id="marketing_consent">
+            <label class="form-check-label small" for="marketing_consent">
+              I'd like to receive updates about future activities and offers from Inventors League.
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 4: Promo code + Pay -->
+      <div class="card p-4" id="pay-section" style="display:none">
+        <h5 class="fw-bold mb-3"><span class="badge bg-success me-2">4</span>Payment</h5>
+
+        <div class="mb-3">
+          <label class="form-label small">Promo code (optional)</label>
+          <div class="input-group" style="max-width:300px">
+            <input type="text" id="promo-input" name="promo_code" class="form-control form-control-sm text-uppercase" placeholder="Enter code">
+            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="applyPromo()">Apply</button>
+          </div>
+          <div id="promo-msg" class="small mt-1"></div>
+        </div>
+
+        <div class="bg-light rounded p-3 mb-4">
+          <div class="d-flex justify-content-between mb-1">
+            <span class="text-muted">Sessions: <span id="sessions-count">0</span></span>
+            <span id="subtotal-display">£0.00</span>
+          </div>
+          <div class="d-flex justify-content-between mb-1" id="discount-row" style="display:none!important">
+            <span class="text-success">Discount (<span id="discount-label"></span>)</span>
+            <span class="text-success" id="discount-display">-£0.00</span>
+          </div>
+          <hr class="my-2">
+          <div class="d-flex justify-content-between fw-bold">
+            <span>Total due</span>
+            <span class="text-success fs-5" id="total-display">£0.00</span>
+          </div>
+        </div>
+
+        <div class="d-flex align-items-center gap-2">
+          <button type="submit" class="btn btn-success btn-lg px-5" id="pay-btn">
+            <i class="bi bi-lock-fill me-2"></i>Pay securely with Stripe
+          </button>
+        </div>
+        <p class="text-muted small mt-2"><i class="bi bi-shield-check me-1"></i>Your payment is encrypted and processed securely by Stripe. We never store your card details.</p>
+      </div>
+
+    </form>
+  </div>
+
+  <!-- Right: summary -->
+  <div class="col-lg-4">
+    <div class="card p-4 sticky-top" style="top:1rem">
+      <h6 class="fw-bold mb-3">Booking Summary</h6>
+      <div class="mb-3">
+        <div class="fw-semibold">{{ programme.name }}</div>
+        {% if programme.location_name %}<div class="text-muted small">{{ programme.location_name }}</div>{% endif %}
+      </div>
+      <div class="border-top pt-3">
+        <div class="text-muted small mb-2">Selected sessions:</div>
+        <div id="summary-sessions" class="small">
+          <span class="text-muted fst-italic">None selected</span>
+        </div>
+      </div>
+      <div class="border-top mt-3 pt-3">
+        <div class="d-flex justify-content-between">
+          <span class="text-muted small">Price per session</span>
+          <span class="fw-semibold">£{{ '{:.2f}'.format(programme.price_per_session or 0) }}</span>
+        </div>
+        <div class="d-flex justify-content-between mt-1">
+          <span class="fw-bold">Total</span>
+          <span class="fw-bold text-success" id="summary-total">£0.00</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script>
+const pricePerSession = {{ programme.price_per_session or 0 }};
+const programmeId = {{ programme.id }};
+let currentDiscount = 0;
+let currentDiscountLabel = '';
+
+// Map session id → display date string
+const sessionDates = {
+  {% for s in sessions %}
+  {{ s.id }}: '{{ s.date.strftime("%a %d %b") }}',
+  {% endfor %}
+};
+
+function onSessionToggle(cb, sessionId) {
+  const card = document.getElementById('card-' + sessionId);
+  if (cb.checked) {
+    card.classList.add('selected');
+  } else {
+    card.classList.remove('selected');
+  }
+  updateUI();
+}
+
+function selectAll() {
+  document.querySelectorAll('.session-cb:not(:disabled)').forEach(cb => {
+    cb.checked = true;
+    const card = document.getElementById('card-' + cb.value);
+    if (card) card.classList.add('selected');
+  });
+  updateUI();
+}
+
+function selectNone() {
+  document.querySelectorAll('.session-cb').forEach(cb => {
+    cb.checked = false;
+    const card = document.getElementById('card-' + cb.value);
+    if (card) card.classList.remove('selected');
+  });
+  updateUI();
+}
+
+function updateUI() {
+  const checked = [...document.querySelectorAll('.session-cb:checked')];
+  const count = checked.length;
+  const subtotal = count * pricePerSession;
+  const discount = Math.min(currentDiscount, subtotal);
+  const total = Math.max(0, subtotal - discount);
+
+  // Update totals
+  document.getElementById('sessions-count').textContent = count + ' session' + (count !== 1 ? 's' : '');
+  document.getElementById('subtotal-display').textContent = '£' + subtotal.toFixed(2);
+  document.getElementById('total-display').textContent = '£' + total.toFixed(2);
+  document.getElementById('summary-total').textContent = '£' + total.toFixed(2);
+
+  // Discount row
+  const discRow = document.getElementById('discount-row');
+  if (discount > 0) {
+    discRow.style.display = '';
+    document.getElementById('discount-label').textContent = currentDiscountLabel;
+    document.getElementById('discount-display').textContent = '-£' + discount.toFixed(2);
+  } else {
+    discRow.style.display = 'none';
+  }
+
+  // Summary panel sessions list
+  const summaryEl = document.getElementById('summary-sessions');
+  if (count === 0) {
+    summaryEl.innerHTML = '<span class="text-muted fst-italic">None selected</span>';
+  } else {
+    summaryEl.innerHTML = checked.map(cb => '<div>' + sessionDates[cb.value] + '</div>').join('');
+  }
+
+  // Show/hide form sections
+  const show = count > 0;
+  document.getElementById('details-section').style.display = show ? '' : 'none';
+  document.getElementById('parent-section').style.display = show ? '' : 'none';
+  document.getElementById('pay-section').style.display = show ? '' : 'none';
+}
+
+async function applyPromo() {
+  const code = document.getElementById('promo-input').value.trim().toUpperCase();
+  const checked = [...document.querySelectorAll('.session-cb:checked')];
+  const subtotal = checked.length * pricePerSession;
+  const msgEl = document.getElementById('promo-msg');
+
+  if (!code) return;
+
+  const res = await fetch('/api/promo/validate', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({code, programme_id: programmeId, subtotal}),
+  });
+  const data = await res.json();
+  if (data.valid) {
+    currentDiscount = data.discount_amount;
+    currentDiscountLabel = data.label;
+    msgEl.innerHTML = '<span class="text-success"><i class="bi bi-check-circle me-1"></i>' + data.message + '</span>';
+  } else {
+    currentDiscount = 0;
+    currentDiscountLabel = '';
+    msgEl.innerHTML = '<span class="text-danger"><i class="bi bi-x-circle me-1"></i>' + data.message + '</span>';
+  }
+  updateUI();
+}
+
+// Prevent double-submit
+document.getElementById('booking-form').addEventListener('submit', function() {
+  document.getElementById('pay-btn').disabled = true;
+  document.getElementById('pay-btn').innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Redirecting to payment…';
+});
+</script>
+{% endblock %}

@@ -1,0 +1,146 @@
+{% extends 'base.html' %}
+{% block title %}{{ programme.name }}{% endblock %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h4 class="fw-bold mb-1">{{ programme.name }}</h4>
+    <span class="badge {{ 'bg-success' if programme.is_active else 'bg-secondary' }} me-1">{{ 'Active' if programme.is_active else 'Inactive' }}</span>
+    {% if programme.is_public %}<span class="badge bg-info me-1">Public</span>{% endif %}
+    {% if programme.activity_type %}<span class="badge bg-light text-dark">{{ programme.activity_type }}</span>{% endif %}
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{{ url_for('public_activity', slug=programme.slug) }}" class="btn btn-outline-success btn-sm" target="_blank"><i class="bi bi-box-arrow-up-right me-1"></i>Public Page</a>
+    <a href="{{ url_for('programme_edit', programme_id=programme.id) }}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-pencil me-1"></i>Edit</a>
+    <a href="{{ url_for('programmes') }}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>Back</a>
+  </div>
+</div>
+
+<!-- Stats -->
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3">
+    <div class="card stat-card p-3" style="border-color:#198754">
+      <div class="text-muted small">Sessions</div>
+      <div class="fs-3 fw-bold">{{ sessions | length }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card stat-card p-3" style="border-color:#0d6efd">
+      <div class="text-muted small">Bookings</div>
+      <div class="fs-3 fw-bold">{{ enrolments | length }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card stat-card p-3" style="border-color:#ffc107">
+      <div class="text-muted small">Price/Session</div>
+      <div class="fs-3 fw-bold">£{{ '{:.2f}'.format(programme.price_per_session or 0) }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card stat-card p-3" style="border-color:#6f42c1">
+      <div class="text-muted small">Revenue</div>
+      <div class="fs-3 fw-bold">£{{ '{:,.0f}'.format(enrolments | sum(attribute='total')) }}</div>
+    </div>
+  </div>
+</div>
+
+<!-- Public booking link -->
+<div class="alert alert-success d-flex align-items-center mb-4">
+  <i class="bi bi-link-45deg fs-5 me-2"></i>
+  <div class="flex-grow-1">
+    <strong>Public booking link:</strong>
+    <code class="ms-2">{{ request.host_url }}book/{{ programme.slug }}</code>
+  </div>
+  <button class="btn btn-sm btn-outline-success" onclick="navigator.clipboard.writeText('{{ request.host_url }}book/{{ programme.slug }}'); this.textContent='Copied!'">Copy</button>
+</div>
+
+<div class="row g-4">
+
+  <!-- Sessions list -->
+  <div class="col-lg-5">
+    <div class="card">
+      <div class="card-header fw-bold py-2 d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-calendar3 me-1"></i>Sessions</span>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-sm table-hover mb-0 align-middle">
+          <thead><tr><th>Date</th><th>Time</th><th>Spaces</th><th></th></tr></thead>
+          <tbody>
+          {% for s in sessions %}
+          <tr>
+            <td class="fw-semibold small">{{ s.date.strftime('%a %d %b %Y') }}</td>
+            <td class="text-muted small">{{ s.start_time }}–{{ s.end_time }}</td>
+            <td>
+              {% set taken = s.spots_taken %}
+              {% set avail = s.spots_available %}
+              <span class="small {% if s.is_full %}text-danger{% elif avail < 5 %}text-warning{% else %}text-success{% endif %}">
+                {{ taken }}/{{ s.capacity }}
+              </span>
+            </td>
+            <td>
+              <a href="{{ url_for('programme_register', programme_id=programme.id, session_id=s.id) }}"
+                 class="btn btn-sm btn-outline-secondary" target="_blank" title="Print register">
+                <i class="bi bi-printer"></i>
+              </a>
+            </td>
+          </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Enrolments -->
+  <div class="col-lg-7">
+    <div class="card">
+      <div class="card-header fw-bold py-2"><i class="bi bi-people me-1"></i>Enrolments (paid)</div>
+      {% if enrolments %}
+      <div class="table-responsive">
+        <table class="table table-sm table-hover mb-0 align-middle">
+          <thead><tr><th>Child</th><th>Parent</th><th>Sessions</th><th>Paid</th><th>Booked</th></tr></thead>
+          <tbody>
+          {% for e in enrolments %}
+          <tr>
+            <td class="fw-semibold small">{{ e.child_name }}
+              {% if e.medical_notes %}<i class="bi bi-heart-pulse text-danger ms-1" title="{{ e.medical_notes }}"></i>{% endif %}
+            </td>
+            <td class="small">
+              <div>{{ e.parent_name }}</div>
+              <div class="text-muted">{{ e.parent_email }}</div>
+            </td>
+            <td class="small text-muted">{{ e.sessions | length }}</td>
+            <td class="fw-semibold small text-success">£{{ '{:.2f}'.format(e.total) }}</td>
+            <td class="text-muted small">{{ e.created_at.strftime('%d %b') }}</td>
+          </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="card-body text-muted small">No paid enrolments yet.</div>
+      {% endif %}
+    </div>
+
+    <!-- Promo codes -->
+    {% if promo_codes %}
+    <div class="card mt-4 p-3">
+      <div class="fw-bold mb-2"><i class="bi bi-tag me-1"></i>Promo Codes</div>
+      <ul class="list-group list-group-flush">
+        {% for pc in promo_codes %}
+        <li class="list-group-item px-0 d-flex justify-content-between align-items-center">
+          <span class="fw-semibold small">{{ pc.code }}</span>
+          <span class="text-muted small">
+            {{ pc.discount_value|int }}{{ '%' if pc.discount_type=='percent' else '£' }} off ·
+            {{ pc.uses_count }}{% if pc.max_uses %}/{{ pc.max_uses }}{% endif %} uses
+          </span>
+          <span class="badge {{ 'bg-success' if pc.active else 'bg-secondary' }}">{{ 'On' if pc.active else 'Off' }}</span>
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+  </div>
+
+</div>
+{% endblock %}

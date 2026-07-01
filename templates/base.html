@@ -52,6 +52,9 @@
     <a href="{{ url_for('bookings') }}" class="{% if 'booking' in request.endpoint %}active{% endif %}">
       <i class="bi bi-calendar-check me-2"></i>Bookings
     </a>
+    <a href="{{ url_for('programmes') }}" class="{% if 'programme' in (request.endpoint or '') or request.endpoint == 'promo_codes' or request.endpoint == 'promo_code_toggle' or request.endpoint == 'public_book' %}active{% endif %}">
+      <i class="bi bi-rocket me-2"></i>Programmes
+    </a>
     <a href="{{ url_for('finance_dashboard') }}" class="{% if request.endpoint in ('finance_dashboard','finance_reports','finance_export') %}active{% endif %}">
       <i class="bi bi-sterling me-2"></i>Finance
     </a>

@@ -6,7 +6,7 @@ from werkzeug.utils import secure_filename
 from flask import Flask, render_template, redirect, url_for, request, flash, jsonify, send_file
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from sqlalchemy import or_, func
-from models import db, User, School, Activity, Parent, ParentActivity, EmailTemplate, EmailLog, Attachment, Message, Booking, Payment
+from models import db, User, School, Activity, Parent, ParentActivity, EmailTemplate, EmailLog, Attachment, Message, Booking, Payment, Programme, ProgrammeSession, Enrolment, PromoCode, enrolment_sessions
 from brevo import send_email
 from dotenv import load_dotenv
 
@@ -1565,6 +1565,349 @@ def finance_export():
     buf = io.BytesIO(out.read().encode('utf-8-sig'))  # utf-8-sig for Excel compatibility
     return send_file(buf, mimetype='text/csv', as_attachment=True,
                      download_name=f'InventorsLeague-Finance-{year}.csv')
+
+
+# ── Programmes (Pebble replacement) ───────────────────────────────────────────
+
+def make_slug(name):
+    import re
+    return re.sub(r'[^a-z0-9]+', '-', name.lower()).strip('-')
+
+
+def send_confirmation_email(enrolment):
+    """Send booking confirmation to parent."""
+    session_lines = '\n'.join(
+        f"• {s.date.strftime('%A %d %B %Y')} {s.start_time}–{s.end_time}"
+        for s in sorted(enrolment.sessions, key=lambda x: x.date)
+    )
+    body = f"""
+    <p>Dear {enrolment.parent_name.split()[0]},</p>
+    <p>Thank you for booking with Inventors League! Here's a summary of your booking:</p>
+    <p><strong>Activity:</strong> {enrolment.programme.name}<br>
+    <strong>Child:</strong> {enrolment.child_name}<br>
+    <strong>Location:</strong> {enrolment.programme.location_name or ''} {enrolment.programme.location_address or ''}</p>
+    <p><strong>Sessions booked:</strong><br>
+    {session_lines.replace(chr(10), '<br>')}</p>
+    <p><strong>Total paid: £{enrolment.total:.2f}</strong></p>
+    <p>If you have any questions please reply to this email or call us.<br>
+    We look forward to seeing {enrolment.child_name}!</p>
+    <p>The Inventors League Team</p>
+    """
+    send_email(enrolment.parent_email, enrolment.parent_name,
+               f'Booking Confirmed — {enrolment.programme.name}', body)
+
+
+@app.route('/programmes')
+@login_required
+def programmes():
+    all_progs = Programme.query.order_by(Programme.start_date.desc()).all()
+    return render_template('programmes/index.html', programmes=all_progs)
+
+
+@app.route('/programmes/new', methods=['GET', 'POST'])
+@login_required
+@manager_required
+def programme_new():
+    schools = School.query.order_by(School.name).all()
+    if request.method == 'POST':
+        name = request.form.get('name', '').strip()
+        base_slug = make_slug(name)
+        slug = base_slug
+        counter = 1
+        while Programme.query.filter_by(slug=slug).first():
+            slug = f'{base_slug}-{counter}'
+            counter += 1
+
+        start_str = request.form.get('start_date')
+        end_str   = request.form.get('end_date')
+        p = Programme(
+            slug=slug,
+            name=name,
+            description=request.form.get('description', '').strip(),
+            activity_type=request.form.get('activity_type'),
+            location_name=request.form.get('location_name', '').strip(),
+            location_address=request.form.get('location_address', '').strip(),
+            start_date=datetime.strptime(start_str, '%Y-%m-%d').date() if start_str else None,
+            end_date=datetime.strptime(end_str, '%Y-%m-%d').date() if end_str else None,
+            days_of_week=','.join(request.form.getlist('days_of_week')),
+            start_time=request.form.get('start_time'),
+            end_time=request.form.get('end_time'),
+            min_age_years=request.form.get('min_age_years', type=int),
+            max_age_years=request.form.get('max_age_years', type=int),
+            capacity_per_session=request.form.get('capacity_per_session', 20, type=int),
+            price_per_session=request.form.get('price_per_session', 0, type=float),
+            is_active=bool(request.form.get('is_active')),
+            is_public=bool(request.form.get('is_public')),
+            school_id=request.form.get('school_id', type=int) or None,
+        )
+        db.session.add(p)
+        db.session.flush()
+        p.generate_sessions()
+        db.session.commit()
+        flash(f'Programme created with {p.sessions.count()} sessions.', 'success')
+        return redirect(url_for('programme_detail', programme_id=p.id))
+    return render_template('programmes/new.html', schools=schools)
+
+
+@app.route('/programmes/<int:programme_id>')
+@login_required
+def programme_detail(programme_id):
+    p = Programme.query.get_or_404(programme_id)
+    sessions = p.sessions.filter_by(cancelled=False).all()
+    enrolments = p.enrolments.filter_by(payment_status='paid').order_by(Enrolment.created_at.desc()).all()
+    promo_codes = p.promo_codes.all()
+    return render_template('programmes/detail.html', programme=p, sessions=sessions,
+                           enrolments=enrolments, promo_codes=promo_codes)
+
+
+@app.route('/programmes/<int:programme_id>/edit', methods=['GET', 'POST'])
+@login_required
+@manager_required
+def programme_edit(programme_id):
+    p = Programme.query.get_or_404(programme_id)
+    schools = School.query.order_by(School.name).all()
+    if request.method == 'POST':
+        p.name = request.form.get('name', '').strip()
+        p.description = request.form.get('description', '').strip()
+        p.activity_type = request.form.get('activity_type')
+        p.location_name = request.form.get('location_name', '').strip()
+        p.location_address = request.form.get('location_address', '').strip()
+        p.start_time = request.form.get('start_time')
+        p.end_time = request.form.get('end_time')
+        p.min_age_years = request.form.get('min_age_years', type=int)
+        p.max_age_years = request.form.get('max_age_years', type=int)
+        p.capacity_per_session = request.form.get('capacity_per_session', 20, type=int)
+        p.price_per_session = request.form.get('price_per_session', 0, type=float)
+        p.is_active = bool(request.form.get('is_active'))
+        p.is_public = bool(request.form.get('is_public'))
+        p.school_id = request.form.get('school_id', type=int) or None
+        db.session.commit()
+        flash('Programme updated.', 'success')
+        return redirect(url_for('programme_detail', programme_id=p.id))
+    return render_template('programmes/edit.html', programme=p, schools=schools)
+
+
+@app.route('/programmes/<int:programme_id>/register/<int:session_id>')
+@login_required
+def programme_register(programme_id, session_id):
+    p = Programme.query.get_or_404(programme_id)
+    session = ProgrammeSession.query.get_or_404(session_id)
+    enrolments = Enrolment.query.filter_by(payment_status='paid').filter(
+        Enrolment.sessions.any(ProgrammeSession.id == session_id)
+    ).order_by(Enrolment.child_name).all()
+    return render_template('programmes/register.html', programme=p, session=session,
+                           enrolments=enrolments)
+
+
+@app.route('/programmes/promo-codes', methods=['GET', 'POST'])
+@login_required
+@manager_required
+def promo_codes():
+    if request.method == 'POST':
+        valid_from_str = request.form.get('valid_from')
+        valid_until_str = request.form.get('valid_until')
+        pc = PromoCode(
+            code=request.form.get('code', '').strip().upper(),
+            discount_type=request.form.get('discount_type', 'percent'),
+            discount_value=request.form.get('discount_value', type=float),
+            max_uses=request.form.get('max_uses', type=int) or None,
+            programme_id=request.form.get('programme_id', type=int) or None,
+            valid_from=datetime.strptime(valid_from_str, '%Y-%m-%d').date() if valid_from_str else None,
+            valid_until=datetime.strptime(valid_until_str, '%Y-%m-%d').date() if valid_until_str else None,
+            active=True,
+        )
+        db.session.add(pc)
+        db.session.commit()
+        flash('Promo code created.', 'success')
+        return redirect(url_for('promo_codes'))
+    all_codes = PromoCode.query.order_by(PromoCode.created_at.desc()).all()
+    programmes_list = Programme.query.order_by(Programme.name).all()
+    return render_template('programmes/promo_codes.html', promo_codes=all_codes,
+                           programmes=programmes_list, today=date.today())
+
+
+@app.route('/programmes/promo-codes/<int:code_id>/toggle', methods=['POST'])
+@login_required
+@manager_required
+def promo_code_toggle(code_id):
+    pc = PromoCode.query.get_or_404(code_id)
+    pc.active = not pc.active
+    db.session.commit()
+    return redirect(url_for('promo_codes'))
+
+
+# ── Public Booking Portal ──────────────────────────────────────────────────────
+
+@app.route('/book')
+def public_book():
+    programmes_list = Programme.query.filter_by(is_public=True, is_active=True).order_by(
+        Programme.start_date).all()
+    return render_template('public/book.html', programmes=programmes_list)
+
+
+@app.route('/book/<slug>')
+def public_activity(slug):
+    p = Programme.query.filter_by(slug=slug, is_public=True, is_active=True).first_or_404()
+    sessions = p.sessions.filter_by(cancelled=False).filter(
+        ProgrammeSession.date >= date.today()
+    ).all()
+    return render_template('public/activity.html', programme=p, sessions=sessions)
+
+
+@app.route('/book/<slug>/enrol', methods=['POST'])
+def public_enrol(slug):
+    import stripe as stripe_lib
+    stripe_lib.api_key = os.environ.get('STRIPE_SECRET_KEY')
+
+    p = Programme.query.filter_by(slug=slug, is_public=True, is_active=True).first_or_404()
+    session_ids = request.form.getlist('sessions', type=int)
+    if not session_ids:
+        flash('Please select at least one session.', 'danger')
+        return redirect(url_for('public_activity', slug=slug))
+
+    selected_sessions = ProgrammeSession.query.filter(
+        ProgrammeSession.id.in_(session_ids),
+        ProgrammeSession.programme_id == p.id
+    ).all()
+
+    # Parse child DOB
+    dob_str = request.form.get('child_dob')
+    child_dob = datetime.strptime(dob_str, '%Y-%m-%d').date() if dob_str else None
+
+    subtotal = len(selected_sessions) * (p.price_per_session or 0)
+    discount_amount = 0
+    promo_code_id = None
+
+    # Apply promo code
+    promo_code_str = request.form.get('promo_code', '').strip().upper()
+    if promo_code_str:
+        pc = PromoCode.query.filter_by(code=promo_code_str).first()
+        if pc:
+            valid, msg = pc.is_valid_for(p.id)
+            if valid:
+                discount_amount = pc.calculate_discount(subtotal)
+                promo_code_id = pc.id
+
+    total = max(0, subtotal - discount_amount)
+
+    enrolment = Enrolment(
+        programme_id=p.id,
+        parent_name=request.form.get('parent_name', '').strip(),
+        parent_email=request.form.get('parent_email', '').strip(),
+        parent_phone=request.form.get('parent_phone', '').strip(),
+        child_name=request.form.get('child_name', '').strip(),
+        child_dob=child_dob,
+        emergency_name=request.form.get('emergency_name', '').strip(),
+        emergency_phone=request.form.get('emergency_phone', '').strip(),
+        medical_notes=request.form.get('medical_notes', '').strip(),
+        marketing_consent=bool(request.form.get('marketing_consent')),
+        photo_consent=bool(request.form.get('photo_consent')),
+        promo_code_id=promo_code_id,
+        subtotal=subtotal,
+        discount_amount=discount_amount,
+        total=total,
+        sessions=selected_sessions,
+        payment_status='pending',
+    )
+    db.session.add(enrolment)
+    db.session.commit()
+
+    # If total is 0 (100% discount), skip Stripe
+    if total == 0:
+        enrolment.payment_status = 'paid'
+        enrolment.paid_at = datetime.utcnow()
+        db.session.commit()
+        send_confirmation_email(enrolment)
+        return redirect(url_for('public_success', enrolment_id=enrolment.id))
+
+    # Create Stripe Checkout Session
+    base_url = request.host_url.rstrip('/')
+    try:
+        checkout = stripe_lib.checkout.Session.create(
+            payment_method_types=['card'],
+            line_items=[{
+                'price_data': {
+                    'currency': 'gbp',
+                    'unit_amount': int(total * 100),
+                    'product_data': {
+                        'name': f'{p.name} — {len(selected_sessions)} session{"s" if len(selected_sessions) != 1 else ""}',
+                        'description': f'{enrolment.child_name}',
+                    },
+                },
+                'quantity': 1,
+            }],
+            mode='payment',
+            customer_email=enrolment.parent_email,
+            metadata={'enrolment_id': str(enrolment.id)},
+            success_url=f'{base_url}/book/success?session_id={{CHECKOUT_SESSION_ID}}',
+            cancel_url=f'{base_url}/book/{slug}',
+        )
+        enrolment.stripe_session_id = checkout.id
+        db.session.commit()
+        return redirect(checkout.url, code=303)
+    except Exception as e:
+        db.session.delete(enrolment)
+        db.session.commit()
+        flash(f'Payment setup failed: {e}', 'danger')
+        return redirect(url_for('public_activity', slug=slug))
+
+
+@app.route('/book/success')
+def public_success():
+    session_id = request.args.get('session_id')
+    enrolment_id = request.args.get('enrolment_id', type=int)
+    enrolment = None
+    if session_id:
+        enrolment = Enrolment.query.filter_by(stripe_session_id=session_id).first()
+    elif enrolment_id:
+        enrolment = Enrolment.query.get(enrolment_id)
+    return render_template('public/success.html', enrolment=enrolment)
+
+
+@app.route('/webhooks/stripe', methods=['POST'])
+def stripe_webhook():
+    import stripe as stripe_lib
+    stripe_lib.api_key = os.environ.get('STRIPE_SECRET_KEY')
+    webhook_secret = os.environ.get('STRIPE_WEBHOOK_SECRET')
+
+    payload = request.get_data()
+    sig_header = request.headers.get('Stripe-Signature')
+
+    try:
+        event = stripe_lib.Webhook.construct_event(payload, sig_header, webhook_secret)
+    except Exception:
+        return jsonify({'error': 'Invalid signature'}), 400
+
+    if event['type'] == 'checkout.session.completed':
+        session = event['data']['object']
+        enrolment_id = session.get('metadata', {}).get('enrolment_id')
+        if enrolment_id:
+            enrolment = Enrolment.query.get(int(enrolment_id))
+            if enrolment and enrolment.payment_status != 'paid':
+                enrolment.payment_status = 'paid'
+                enrolment.paid_at = datetime.utcnow()
+                enrolment.stripe_payment_intent = session.get('payment_intent')
+                db.session.commit()
+                send_confirmation_email(enrolment)
+
+    return jsonify({'status': 'ok'})
+
+
+@app.route('/api/promo/validate', methods=['POST'])
+def promo_validate():
+    code = request.json.get('code', '').strip().upper()
+    programme_id = request.json.get('programme_id', type=int)
+    subtotal = request.json.get('subtotal', 0)
+    pc = PromoCode.query.filter_by(code=code).first()
+    if not pc:
+        return jsonify({'valid': False, 'message': 'Promo code not found.'})
+    valid, message = pc.is_valid_for(programme_id)
+    if not valid:
+        return jsonify({'valid': False, 'message': message})
+    discount = pc.calculate_discount(subtotal)
+    label = f'{int(pc.discount_value)}%' if pc.discount_type == 'percent' else f'£{pc.discount_value:.2f}'
+    return jsonify({'valid': True, 'discount_amount': discount, 'label': label,
+                    'message': f'{label} discount applied!'})
 
 
 # ── Data Import ───────────────────────────────────────────────────────────────

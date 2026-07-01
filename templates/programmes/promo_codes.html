@@ -1,0 +1,133 @@
+{% extends 'base.html' %}
+{% block title %}Promo Codes{% endblock %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h4 class="fw-bold mb-0">Promo Codes</h4>
+  <a href="{{ url_for('programmes') }}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>Programmes</a>
+</div>
+
+<div class="row g-4">
+
+  <!-- Create form -->
+  <div class="col-lg-4">
+    <div class="card p-4">
+      <h6 class="fw-bold mb-3">Create Promo Code</h6>
+      <form method="post">
+        <div class="mb-3">
+          <label class="form-label">Code <span class="text-danger">*</span></label>
+          <input type="text" name="code" class="form-control text-uppercase" required placeholder="e.g. EARLYBIRD26" style="text-transform:uppercase">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Discount type</label>
+          <select name="discount_type" class="form-select" id="disc_type" onchange="updateLabel()">
+            <option value="percent">Percentage (%)</option>
+            <option value="fixed">Fixed amount (£)</option>
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label" id="disc_label">Discount value (%)</label>
+          <input type="number" name="discount_value" class="form-control" required step="0.01" min="0" placeholder="10">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Max uses <span class="text-muted small">(blank = unlimited)</span></label>
+          <input type="number" name="max_uses" class="form-control" min="1" placeholder="48">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Restrict to programme <span class="text-muted small">(optional)</span></label>
+          <select name="programme_id" class="form-select">
+            <option value="">All programmes</option>
+            {% for p in programmes %}
+            <option value="{{ p.id }}">{{ p.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="row g-2 mb-3">
+          <div class="col">
+            <label class="form-label">Valid from</label>
+            <input type="date" name="valid_from" class="form-control">
+          </div>
+          <div class="col">
+            <label class="form-label">Valid until</label>
+            <input type="date" name="valid_until" class="form-control">
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary w-100"><i class="bi bi-plus-lg me-1"></i>Create Code</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Codes list -->
+  <div class="col-lg-8">
+    <div class="card">
+      <div class="card-header fw-bold py-2"><i class="bi bi-tag me-1"></i>All Promo Codes</div>
+      {% if promo_codes %}
+      <div class="table-responsive">
+        <table class="table table-sm table-hover mb-0 align-middle">
+          <thead>
+            <tr>
+              <th>Code</th>
+              <th>Discount</th>
+              <th>Programme</th>
+              <th>Uses</th>
+              <th>Valid Until</th>
+              <th>Status</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+          {% for pc in promo_codes %}
+          <tr>
+            <td class="fw-bold">{{ pc.code }}</td>
+            <td>
+              {% if pc.discount_type == 'percent' %}
+              {{ pc.discount_value|int }}% off
+              {% else %}
+              £{{ '{:.2f}'.format(pc.discount_value) }} off
+              {% endif %}
+            </td>
+            <td class="small text-muted">{{ pc.programme.name if pc.programme else 'All' }}</td>
+            <td class="small">
+              {{ pc.uses_count }}{% if pc.max_uses %}/{{ pc.max_uses }}{% endif %}
+            </td>
+            <td class="small text-muted">
+              {% if pc.valid_until %}
+                {% if pc.valid_until < today %}
+                <span class="text-danger">{{ pc.valid_until.strftime('%d %b %Y') }} (expired)</span>
+                {% else %}
+                {{ pc.valid_until.strftime('%d %b %Y') }}
+                {% endif %}
+              {% else %}—{% endif %}
+            </td>
+            <td>
+              <span class="badge {{ 'bg-success' if pc.active else 'bg-secondary' }}">
+                {{ 'Active' if pc.active else 'Inactive' }}
+              </span>
+            </td>
+            <td>
+              <form method="post" action="{{ url_for('promo_code_toggle', code_id=pc.id) }}">
+                <button type="submit" class="btn btn-sm btn-outline-secondary">
+                  {{ 'Disable' if pc.active else 'Enable' }}
+                </button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="card-body text-muted small">No promo codes yet.</div>
+      {% endif %}
+    </div>
+  </div>
+
+</div>
+
+<script>
+function updateLabel() {
+  const type = document.getElementById('disc_type').value;
+  document.getElementById('disc_label').textContent = type === 'percent' ? 'Discount value (%)' : 'Discount value (£)';
+}
+</script>
+{% endblock %}

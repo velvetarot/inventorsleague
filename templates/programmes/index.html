@@ -1,0 +1,67 @@
+{% extends 'base.html' %}
+{% block title %}Programmes{% endblock %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h4 class="fw-bold mb-0">Programmes</h4>
+  <div class="d-flex gap-2">
+    <a href="{{ url_for('promo_codes') }}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-tag me-1"></i>Promo Codes</a>
+    <a href="{{ url_for('public_book') }}" class="btn btn-outline-success btn-sm" target="_blank"><i class="bi bi-box-arrow-up-right me-1"></i>Public Page</a>
+    <a href="{{ url_for('programme_new') }}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg me-1"></i>New Programme</a>
+  </div>
+</div>
+
+{% set type_icons = {'After School Club':'bi-clock','Holiday Camp':'bi-sun','Workshop (Half Day)':'bi-easel','Workshop (Full Day)':'bi-easel-fill','Birthday Party':'bi-balloon-heart','Other':'bi-calendar-event'} %}
+
+{% if programmes %}
+<div class="row g-4">
+  {% for p in programmes %}
+  <div class="col-md-6 col-lg-4">
+    <div class="card h-100 p-4">
+      <div class="d-flex justify-content-between align-items-start mb-2">
+        <span class="badge {{ 'bg-success' if p.is_active else 'bg-secondary' }}">
+          {{ 'Active' if p.is_active else 'Inactive' }}
+        </span>
+        {% if p.is_public %}
+        <span class="badge bg-info">Public</span>
+        {% endif %}
+      </div>
+      <h6 class="fw-bold mb-1">
+        <i class="bi {{ type_icons.get(p.activity_type, 'bi-calendar-event') }} me-1 text-success"></i>
+        {{ p.name }}
+      </h6>
+      {% if p.school %}
+      <div class="text-muted small mb-2">{{ p.school.name }}</div>
+      {% endif %}
+      <ul class="list-unstyled small text-muted mb-3">
+        {% if p.start_date %}
+        <li><i class="bi bi-calendar3 me-1"></i>{{ p.start_date.strftime('%d %b') }}{% if p.end_date %} – {{ p.end_date.strftime('%d %b %Y') }}{% endif %}</li>
+        {% endif %}
+        {% if p.start_time %}
+        <li><i class="bi bi-clock me-1"></i>{{ p.start_time }}–{{ p.end_time }}</li>
+        {% endif %}
+        {% if p.location_name %}
+        <li><i class="bi bi-geo-alt me-1"></i>{{ p.location_name }}</li>
+        {% endif %}
+      </ul>
+      <div class="d-flex justify-content-between align-items-center mt-auto">
+        <div>
+          <span class="fw-semibold text-success">£{{ '{:.2f}'.format(p.price_per_session or 0) }}</span>
+          <span class="text-muted small">/session</span>
+          <div class="text-muted small">{{ p.sessions.count() }} sessions · {{ p.total_paid_enrolments }} booked</div>
+        </div>
+        <a href="{{ url_for('programme_detail', programme_id=p.id) }}" class="btn btn-sm btn-outline-primary">View</a>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="text-center text-muted py-5">
+  <i class="bi bi-calendar-x fs-1 d-block mb-3"></i>
+  <h5>No programmes yet</h5>
+  <a href="{{ url_for('programme_new') }}" class="btn btn-primary mt-2">Create your first programme</a>
+</div>
+{% endif %}
+
+{% endblock %}

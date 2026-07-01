@@ -1,0 +1,142 @@
+{% extends 'base.html' %}
+{% block title %}New Programme{% endblock %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h4 class="fw-bold mb-0">New Programme</h4>
+  <a href="{{ url_for('programmes') }}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>Back</a>
+</div>
+
+<form method="post">
+  <div class="row g-4">
+
+    <div class="col-lg-7">
+      <div class="card p-4 mb-4">
+        <h6 class="fw-bold mb-3">Programme Details</h6>
+
+        <div class="mb-3">
+          <label class="form-label">Name <span class="text-danger">*</span></label>
+          <input type="text" name="name" class="form-control" required placeholder="e.g. Robot Rampage Summer Camp">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Type</label>
+          <select name="activity_type" class="form-select">
+            <option value="">— Select —</option>
+            <option>After School Club</option>
+            <option>Holiday Camp</option>
+            <option>Workshop (Half Day)</option>
+            <option>Workshop (Full Day)</option>
+            <option>Birthday Party</option>
+            <option>Assembly</option>
+            <option>Other</option>
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Description</label>
+          <textarea name="description" class="form-control" rows="3" placeholder="What will children be doing? Why is it great?"></textarea>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Linked School <span class="text-muted small">(optional — for school clubs)</span></label>
+          <select name="school_id" class="form-select">
+            <option value="">— None —</option>
+            {% for s in schools %}
+            <option value="{{ s.id }}">{{ s.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label">Min age (years)</label>
+            <input type="number" name="min_age_years" class="form-control" min="1" max="18" placeholder="e.g. 7">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Max age (years)</label>
+            <input type="number" name="max_age_years" class="form-control" min="1" max="18" placeholder="e.g. 14">
+          </div>
+        </div>
+      </div>
+
+      <div class="card p-4 mb-4">
+        <h6 class="fw-bold mb-3">Location</h6>
+        <div class="mb-3">
+          <label class="form-label">Venue name</label>
+          <input type="text" name="location_name" class="form-control" placeholder="e.g. Bledlow Ridge Village Hall">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Full address</label>
+          <input type="text" name="location_address" class="form-control" placeholder="e.g. Chinnor Road, High Wycombe, HP14 4AJ">
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-5">
+      <div class="card p-4 mb-4">
+        <h6 class="fw-bold mb-3">Schedule & Sessions</h6>
+        <div class="row g-3 mb-3">
+          <div class="col-6">
+            <label class="form-label">Start date</label>
+            <input type="date" name="start_date" class="form-control">
+          </div>
+          <div class="col-6">
+            <label class="form-label">End date</label>
+            <input type="date" name="end_date" class="form-control">
+          </div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Days of week</label>
+          <div class="d-flex flex-wrap gap-2">
+            {% for day in ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'] %}
+            <div class="form-check form-check-inline">
+              <input class="form-check-input" type="checkbox" name="days_of_week" value="{{ day }}" id="day_{{ day }}"
+                {% if day in ['Mon','Tue','Wed','Thu','Fri'] %}checked{% endif %}>
+              <label class="form-check-label" for="day_{{ day }}">{{ day }}</label>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+        <div class="row g-3">
+          <div class="col-6">
+            <label class="form-label">Start time</label>
+            <input type="time" name="start_time" class="form-control" value="09:30">
+          </div>
+          <div class="col-6">
+            <label class="form-label">End time</label>
+            <input type="time" name="end_time" class="form-control" value="15:30">
+          </div>
+        </div>
+      </div>
+
+      <div class="card p-4 mb-4">
+        <h6 class="fw-bold mb-3">Pricing & Capacity</h6>
+        <div class="mb-3">
+          <label class="form-label">Price per session (£)</label>
+          <input type="number" name="price_per_session" class="form-control" step="0.01" min="0" placeholder="0.00">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Capacity per session</label>
+          <input type="number" name="capacity_per_session" class="form-control" value="20" min="1">
+        </div>
+      </div>
+
+      <div class="card p-4">
+        <h6 class="fw-bold mb-3">Visibility</h6>
+        <div class="form-check form-switch mb-2">
+          <input class="form-check-input" type="checkbox" name="is_active" id="is_active" checked>
+          <label class="form-check-label" for="is_active">Active</label>
+        </div>
+        <div class="form-check form-switch">
+          <input class="form-check-input" type="checkbox" name="is_public" id="is_public" checked>
+          <label class="form-check-label" for="is_public">Show on public booking page</label>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="mt-3">
+    <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>Create Programme & Generate Sessions</button>
+    <a href="{{ url_for('programmes') }}" class="btn btn-outline-secondary ms-2">Cancel</a>
+  </div>
+</form>
+
+{% endblock %}
